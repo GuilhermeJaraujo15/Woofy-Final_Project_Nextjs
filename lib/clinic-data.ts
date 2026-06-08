@@ -49,6 +49,9 @@ interface AgendamentoRow {
   tutor_archived_at?: string | null
   veterinario_archived_at?: string | null
   preco_estimado?: number | null
+  is_archived?: boolean | null
+  archived_at?: string | null
+  archived_by?: string | null
   created_at: string
 }
 
@@ -65,6 +68,9 @@ interface ConsultaRow {
   agendamento_id?: string | null
   veterinario_id?: string | null
   valor?: number | null
+  is_archived?: boolean | null
+  archived_at?: string | null
+  archived_by?: string | null
   created_at: string
 }
 
@@ -97,6 +103,9 @@ interface VacinaRow {
   tutor_resposta?: string | null
   tutor_respondeu_em?: string | null
   tutor_motivo_cancelamento?: string | null
+  is_archived?: boolean | null
+  archived_at?: string | null
+  archived_by?: string | null
   created_at: string
 }
 
@@ -118,6 +127,9 @@ interface ExameRow {
   tutor_respondeu_em?: string | null
   tutor_motivo_cancelamento?: string | null
   consulta_id?: string | null
+  is_archived?: boolean | null
+  archived_at?: string | null
+  archived_by?: string | null
   created_at: string
 }
 
@@ -234,6 +246,8 @@ export interface AdminAppointment {
   status: AgendamentoStatus
   tutorArchivedAt: string | null
   veterinarianArchivedAt: string | null
+  isArchived: boolean
+  archivedAt: string | null
   precoEstimado: number | null
   createdAt: string
 }
@@ -280,6 +294,8 @@ export interface AdminConsultation {
   appointmentStartTime: string | null
   appointmentEndTime: string | null
   valor: number | null
+  isArchived: boolean
+  archivedAt: string | null
   createdAt: string
 }
 
@@ -347,6 +363,8 @@ export interface AdminVaccine {
   veterinarioId: string | null
   veterinarianDisplayName: string
   valor: number | null
+  isArchived: boolean
+  archivedAt: string | null
   createdAt: string
 }
 
@@ -372,6 +390,8 @@ export interface AdminExam {
   veterinarioId: string
   veterinarianDisplayName: string
   consultaId: string | null
+  isArchived: boolean
+  archivedAt: string | null
   createdAt: string
 }
 
@@ -445,6 +465,11 @@ export interface CreateExamRecordInput {
   veterinarioId: string
   status?: ExamStatus
   consultaId?: string | null
+}
+
+export interface SafeDeleteResult {
+  deleted: boolean
+  reason?: string
 }
 
 export interface TutorVaccineResponseInput {
@@ -528,9 +553,38 @@ function mapAppointment(
     status: row.status || "agendado",
     tutorArchivedAt: row.tutor_archived_at || null,
     veterinarianArchivedAt: row.veterinario_archived_at || null,
+    isArchived: Boolean(row.is_archived),
+    archivedAt: row.archived_at || null,
     precoEstimado: row.preco_estimado == null ? null : Number(row.preco_estimado),
     createdAt: row.created_at,
   }
+}
+
+const blockedDeleteReason =
+  "Este registro possui vínculos clínicos ou financeiros. Para preservar a integridade do sistema, use Arquivar."
+
+async function hasAnyRows(client: SupabaseBrowserClient, table: string, column: string, value: string) {
+  const { data, error } = await client
+    .from(table)
+    .select("id")
+    .eq(column, value)
+    .limit(1)
+
+  if (error) throw clinicDataError(error)
+  return Boolean(data?.length)
+}
+
+async function hasFinanceLink(client: SupabaseBrowserClient, origemTipo: string, origemId: string) {
+  const { data, error } = await client
+    .from("lancamentos")
+    .select("id")
+    .eq("origem_tipo", origemTipo)
+    .eq("origem_id", origemId)
+    .neq("status", "cancelled")
+    .limit(1)
+
+  if (error) throw clinicDataError(error)
+  return Boolean(data?.length)
 }
 
 function mapClinicAppointment(
@@ -608,6 +662,8 @@ function mapConsultation(
     appointmentStartTime: appointment?.horario_inicio || null,
     appointmentEndTime: appointment?.horario_fim || null,
     valor: row.valor == null ? null : Number(row.valor),
+    isArchived: Boolean(row.is_archived),
+    archivedAt: row.archived_at || null,
     createdAt: row.created_at,
   }
 }
@@ -778,6 +834,8 @@ function mapVaccine(
     veterinarioId: row.veterinario_id || null,
     veterinarianDisplayName: veterinarianProfileName || "A definir",
     valor: row.valor == null ? null : Number(row.valor),
+    isArchived: Boolean(row.is_archived),
+    archivedAt: row.archived_at || null,
     createdAt: row.created_at,
   }
 }
@@ -817,6 +875,8 @@ function mapExam(
     veterinarioId: row.veterinario_id,
     veterinarianDisplayName: veterinarianProfileName || "A definir",
     consultaId: row.consulta_id || null,
+    isArchived: Boolean(row.is_archived),
+    archivedAt: row.archived_at || null,
     createdAt: row.created_at,
   }
 }
@@ -967,6 +1027,20 @@ export async function getAdminPets(client: SupabaseBrowserClient) {
   return rows.map((pet) => mapPet(pet, profilesById))
 }
 
+export async function getArchivedAdminPets(client: SupabaseBrowserClient) {
+  const { data, error } = await client
+    .from("pets")
+    .select("*")
+    .eq("arquivado", true)
+    .order("created_at", { ascending: false })
+
+  if (error) throw clinicDataError(error)
+
+  const rows = (data || []) as PetRow[]
+  const profilesById = await getProfilesByIds(client, rows.map((pet) => pet.user_id))
+  return rows.map((pet) => mapPet(pet, profilesById))
+}
+
 export async function createAdminPet(client: SupabaseBrowserClient, input: SaveAdminPetInput) {
   const { data, error } = await client
     .from("pets")
@@ -1030,6 +1104,7 @@ export async function getPetsForVeterinarianWorkflow(
   let query = client
     .from("agendamentos")
     .select("*")
+    .eq("is_archived", false)
     .order("data", { ascending: true })
     .order("horario_inicio", { ascending: true })
 
@@ -1077,6 +1152,7 @@ export async function getAdminAppointments(client: SupabaseBrowserClient) {
   const { data, error } = await client
     .from("agendamentos")
     .select("*")
+    .eq("is_archived", false)
     .order("data", { ascending: true })
     .order("horario_inicio", { ascending: true })
 
@@ -1101,6 +1177,70 @@ export async function getAdminAppointments(client: SupabaseBrowserClient) {
   }, {})
 
   return rows.map((appointment) => mapAppointment(appointment, petsById, profilesById))
+}
+
+export async function getArchivedAdminAppointments(client: SupabaseBrowserClient) {
+  const { data, error } = await client
+    .from("agendamentos")
+    .select("*")
+    .eq("is_archived", true)
+    .order("archived_at", { ascending: false, nullsFirst: false })
+
+  if (error) throw clinicDataError(error)
+
+  const rows = (data || []) as AgendamentoRow[]
+  const petIds = rows.map((appointment) => appointment.pet_id)
+  const userIds = rows.map((appointment) => appointment.user_id)
+
+  const [{ data: petData, error: petError }, profilesById] = await Promise.all([
+    petIds.length > 0
+      ? client.from("pets").select("*").in("id", [...new Set(petIds)])
+      : Promise.resolve({ data: [], error: null }),
+    getProfilesByIds(client, userIds),
+  ])
+
+  if (petError) throw clinicDataError(petError)
+
+  const petsById = ((petData || []) as PetRow[]).reduce<Record<string, PetRow>>((acc, pet) => {
+    acc[pet.id] = pet
+    return acc
+  }, {})
+
+  return rows.map((appointment) => mapAppointment(appointment, petsById, profilesById))
+}
+
+export async function archiveAdminAppointment(client: SupabaseBrowserClient, appointmentId: string, adminId: string) {
+  const { error } = await client
+    .from("agendamentos")
+    .update({ is_archived: true, archived_at: new Date().toISOString(), archived_by: adminId })
+    .eq("id", appointmentId)
+
+  if (error) throw clinicDataError(error)
+}
+
+export async function restoreAdminAppointment(client: SupabaseBrowserClient, appointmentId: string) {
+  const { error } = await client
+    .from("agendamentos")
+    .update({ is_archived: false, archived_at: null, archived_by: null })
+    .eq("id", appointmentId)
+
+  if (error) throw clinicDataError(error)
+}
+
+export async function safeDeleteAdminAppointment(
+  client: SupabaseBrowserClient,
+  appointmentId: string,
+): Promise<SafeDeleteResult> {
+  const linked =
+    (await hasAnyRows(client, "consultas", "agendamento_id", appointmentId)) ||
+    (await hasAnyRows(client, "historico", "agendamento_id", appointmentId)) ||
+    (await hasFinanceLink(client, "appointment", appointmentId))
+
+  if (linked) return { deleted: false, reason: blockedDeleteReason }
+
+  const { error } = await client.from("agendamentos").delete().eq("id", appointmentId)
+  if (error) throw clinicDataError(error)
+  return { deleted: true }
 }
 
 async function getAppointmentsWithRelations(client: SupabaseBrowserClient, rows: AgendamentoRow[]) {
@@ -1297,6 +1437,7 @@ export async function getTutorAppointments(client: SupabaseBrowserClient, userId
     .from("agendamentos")
     .select("*")
     .eq("user_id", userId)
+    .eq("is_archived", false)
     .order("data", { ascending: true })
     .order("horario_inicio", { ascending: true })
 
@@ -1558,6 +1699,7 @@ export async function getAdminVaccines(client: SupabaseBrowserClient) {
   const { data, error } = await client
     .from("vacinas")
     .select("*")
+    .eq("is_archived", false)
     .order("proxima_dose", { ascending: true, nullsFirst: false })
     .order("data_aplicacao", { ascending: false })
 
@@ -1566,11 +1708,52 @@ export async function getAdminVaccines(client: SupabaseBrowserClient) {
   return mapVaccineRows(client, (data || []) as VacinaRow[])
 }
 
+export async function getArchivedAdminVaccines(client: SupabaseBrowserClient) {
+  const { data, error } = await client
+    .from("vacinas")
+    .select("*")
+    .eq("is_archived", true)
+    .order("archived_at", { ascending: false, nullsFirst: false })
+
+  if (error) throw clinicDataError(error)
+
+  return mapVaccineRows(client, (data || []) as VacinaRow[])
+}
+
+export async function archiveAdminVaccine(client: SupabaseBrowserClient, vaccineId: string, adminId: string) {
+  const { error } = await client
+    .from("vacinas")
+    .update({ is_archived: true, archived_at: new Date().toISOString(), archived_by: adminId })
+    .eq("id", vaccineId)
+
+  if (error) throw clinicDataError(error)
+}
+
+export async function restoreAdminVaccine(client: SupabaseBrowserClient, vaccineId: string) {
+  const { error } = await client
+    .from("vacinas")
+    .update({ is_archived: false, archived_at: null, archived_by: null })
+    .eq("id", vaccineId)
+
+  if (error) throw clinicDataError(error)
+}
+
+export async function safeDeleteAdminVaccine(client: SupabaseBrowserClient, vaccineId: string): Promise<SafeDeleteResult> {
+  if (await hasFinanceLink(client, "vaccine", vaccineId)) {
+    return { deleted: false, reason: blockedDeleteReason }
+  }
+
+  const { error } = await client.from("vacinas").delete().eq("id", vaccineId)
+  if (error) throw clinicDataError(error)
+  return { deleted: true }
+}
+
 export async function getTutorVaccines(client: SupabaseBrowserClient, userId: string) {
   const { data, error } = await client
     .from("vacinas")
     .select("*")
     .eq("user_id", userId)
+    .eq("is_archived", false)
     .order("proxima_dose", { ascending: true, nullsFirst: false })
     .order("data_aplicacao", { ascending: false })
 
@@ -1583,6 +1766,7 @@ export async function getVeterinarianExams(client: SupabaseBrowserClient, veteri
   let query = client
     .from("exames")
     .select("*")
+    .eq("is_archived", false)
     .order("data_agendada", { ascending: false, nullsFirst: false })
     .order("created_at", { ascending: false })
 
@@ -1601,12 +1785,51 @@ export async function getTutorExams(client: SupabaseBrowserClient, userId: strin
     .from("exames")
     .select("*")
     .eq("user_id", userId)
+    .eq("is_archived", false)
     .order("data_agendada", { ascending: false, nullsFirst: false })
     .order("created_at", { ascending: false })
 
   if (error) throw clinicDataError(error)
 
   return mapExamRows(client, (data || []) as ExameRow[])
+}
+
+export async function getArchivedAdminExams(client: SupabaseBrowserClient) {
+  const { data, error } = await client
+    .from("exames")
+    .select("*")
+    .eq("is_archived", true)
+    .order("archived_at", { ascending: false, nullsFirst: false })
+
+  if (error) throw clinicDataError(error)
+
+  return mapExamRows(client, (data || []) as ExameRow[])
+}
+
+export async function archiveAdminExam(client: SupabaseBrowserClient, examId: string, adminId: string) {
+  const { error } = await client
+    .from("exames")
+    .update({ is_archived: true, archived_at: new Date().toISOString(), archived_by: adminId })
+    .eq("id", examId)
+
+  if (error) throw clinicDataError(error)
+}
+
+export async function restoreAdminExam(client: SupabaseBrowserClient, examId: string) {
+  const { error } = await client
+    .from("exames")
+    .update({ is_archived: false, archived_at: null, archived_by: null })
+    .eq("id", examId)
+
+  if (error) throw clinicDataError(error)
+}
+
+export async function safeDeleteAdminExam(client: SupabaseBrowserClient, examId: string): Promise<SafeDeleteResult> {
+  if (await hasFinanceLink(client, "exam", examId)) return { deleted: false, reason: blockedDeleteReason }
+
+  const { error } = await client.from("exames").delete().eq("id", examId)
+  if (error) throw clinicDataError(error)
+  return { deleted: true }
 }
 
 export async function getTutorFinancialSummary(client: SupabaseBrowserClient, userId: string) {
@@ -1752,6 +1975,30 @@ export async function cancelFinanceEntryFromVaccine(client: SupabaseBrowserClien
   if (error) throw clinicDataError(error)
 }
 
+export async function restoreAdminPet(client: SupabaseBrowserClient, petId: string) {
+  const { error } = await client
+    .from("pets")
+    .update({ arquivado: false })
+    .eq("id", petId)
+
+  if (error) throw clinicDataError(error)
+}
+
+export async function safeDeleteAdminPet(client: SupabaseBrowserClient, petId: string): Promise<SafeDeleteResult> {
+  const linked =
+    (await hasAnyRows(client, "agendamentos", "pet_id", petId)) ||
+    (await hasAnyRows(client, "consultas", "pet_id", petId)) ||
+    (await hasAnyRows(client, "vacinas", "pet_id", petId)) ||
+    (await hasAnyRows(client, "exames", "pet_id", petId)) ||
+    (await hasAnyRows(client, "historico", "pet_id", petId))
+
+  if (linked) return { deleted: false, reason: blockedDeleteReason }
+
+  const { error } = await client.from("pets").delete().eq("id", petId)
+  if (error) throw clinicDataError(error)
+  return { deleted: true }
+}
+
 export async function cancelFinanceEntryFromExam(client: SupabaseBrowserClient, examId: string, userId: string) {
   const { error } = await client
     .from("lancamentos")
@@ -1767,6 +2014,7 @@ export async function getVeterinarianVaccines(client: SupabaseBrowserClient, vet
   let query = client
     .from("vacinas")
     .select("*")
+    .eq("is_archived", false)
     .order("data_aplicacao", { ascending: false })
     .order("created_at", { ascending: false })
 
@@ -2083,6 +2331,7 @@ export async function getAdminConsultations(client: SupabaseBrowserClient) {
   const { data, error } = await client
     .from("consultas")
     .select("*")
+    .eq("is_archived", false)
     .order("data", { ascending: false })
     .order("horario", { ascending: true })
 
@@ -2120,6 +2369,82 @@ export async function getAdminConsultations(client: SupabaseBrowserClient) {
   )
 
   return rows.map((consultation) => mapConsultation(consultation, petsById, profilesById, appointmentsById))
+}
+
+export async function getArchivedAdminConsultations(client: SupabaseBrowserClient) {
+  const { data, error } = await client
+    .from("consultas")
+    .select("*")
+    .eq("is_archived", true)
+    .order("archived_at", { ascending: false, nullsFirst: false })
+
+  if (error) throw clinicDataError(error)
+
+  const rows = (data || []) as ConsultaRow[]
+  const petIds = rows.map((consultation) => consultation.pet_id)
+  const profileIds = rows.flatMap((consultation) => [consultation.user_id, consultation.veterinario_id || ""])
+  const appointmentIds = [...new Set(rows.map((consultation) => consultation.agendamento_id).filter(Boolean))] as string[]
+
+  const [{ data: petData, error: petError }, profilesById, { data: appointmentData, error: appointmentError }] =
+    await Promise.all([
+      petIds.length > 0
+        ? client.from("pets").select("*").in("id", [...new Set(petIds)])
+        : Promise.resolve({ data: [], error: null }),
+      getProfilesByIds(client, profileIds),
+      appointmentIds.length > 0
+        ? client.from("agendamentos").select("*").in("id", appointmentIds)
+        : Promise.resolve({ data: [], error: null }),
+    ])
+
+  if (petError) throw clinicDataError(petError)
+  if (appointmentError) throw clinicDataError(appointmentError)
+
+  const petsById = ((petData || []) as PetRow[]).reduce<Record<string, PetRow>>((acc, pet) => {
+    acc[pet.id] = pet
+    return acc
+  }, {})
+  const appointmentsById = ((appointmentData || []) as AgendamentoRow[]).reduce<Record<string, AgendamentoRow>>(
+    (acc, appointment) => {
+      acc[appointment.id] = appointment
+      return acc
+    },
+    {},
+  )
+
+  return rows.map((consultation) => mapConsultation(consultation, petsById, profilesById, appointmentsById))
+}
+
+export async function archiveAdminConsultation(client: SupabaseBrowserClient, consultationId: string, adminId: string) {
+  const { error } = await client
+    .from("consultas")
+    .update({ is_archived: true, archived_at: new Date().toISOString(), archived_by: adminId })
+    .eq("id", consultationId)
+
+  if (error) throw clinicDataError(error)
+}
+
+export async function restoreAdminConsultation(client: SupabaseBrowserClient, consultationId: string) {
+  const { error } = await client
+    .from("consultas")
+    .update({ is_archived: false, archived_at: null, archived_by: null })
+    .eq("id", consultationId)
+
+  if (error) throw clinicDataError(error)
+}
+
+export async function safeDeleteAdminConsultation(
+  client: SupabaseBrowserClient,
+  consultationId: string,
+): Promise<SafeDeleteResult> {
+  const linked =
+    (await hasAnyRows(client, "historico", "consulta_id", consultationId)) ||
+    (await hasFinanceLink(client, "appointment", consultationId))
+
+  if (linked) return { deleted: false, reason: blockedDeleteReason }
+
+  const { error } = await client.from("consultas").delete().eq("id", consultationId)
+  if (error) throw clinicDataError(error)
+  return { deleted: true }
 }
 
 export async function getAdminConsultationWeekdayStats(client: SupabaseBrowserClient) {

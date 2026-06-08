@@ -2,11 +2,18 @@
 
 import { useEffect, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
-import { AlertTriangle, CheckCircle, Loader2, Syringe } from "lucide-react"
+import { AlertTriangle, Archive, CheckCircle, Loader2, Syringe, Trash2 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { createClient } from "@/lib/supabase"
 import { useAuth } from "@/context/auth-context"
-import { getAdminVaccines, type AdminVaccine } from "@/lib/clinic-data"
+import {
+  archiveAdminVaccine,
+  getAdminVaccines,
+  getApprovedVeterinarians,
+  safeDeleteAdminVaccine,
+  type AdminVaccine,
+  type VeterinarianOption,
+} from "@/lib/clinic-data"
 
 type VacinaStatus = "vencida" | "proxima" | "ok" | "sem-dose"
 
@@ -50,6 +57,10 @@ export default function VacinacaoPage() {
   const router = useRouter()
   const supabase = useMemo(() => createClient(), [])
   const [vacinas, setVacinas] = useState<AdminVaccine[]>([])
+  const [veterinarios, setVeterinarios] = useState<VeterinarianOption[]>([])
+  const [filterVeterinarian, setFilterVeterinarian] = useState("todos")
+  const [filterPet, setFilterPet] = useState("")
+  const [filterTutor, setFilterTutor] = useState("")
   const [isLoadingData, setIsLoadingData] = useState(true)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
 
@@ -66,7 +77,12 @@ export default function VacinacaoPage() {
       await refreshProfile(user.id)
 
       try {
-        setVacinas(await getAdminVaccines(supabase))
+        const [vaccinesResult, veterinariansResult] = await Promise.all([
+          getAdminVaccines(supabase),
+          getApprovedVeterinarians(supabase),
+        ])
+        setVacinas(vaccinesResult)
+        setVeterinarios(veterinariansResult)
       } catch {
         setErrorMessage("Não foi possível carregar as vacinas reais do Supabase.")
       } finally {
@@ -77,14 +93,60 @@ export default function VacinacaoPage() {
     loadVaccines()
   }, [loading, refreshProfile, router, supabase, user])
 
+  const filteredVacinas = useMemo(() => {
+    const petSearch = filterPet.trim().toLowerCase()
+    const tutorSearch = filterTutor.trim().toLowerCase()
+
+    return vacinas.filter((vacina) => {
+      const matchesVeterinarian = filterVeterinarian === "todos" || vacina.veterinarioId === filterVeterinarian
+      const matchesPet = !petSearch || vacina.petNome.toLowerCase().includes(petSearch)
+      const matchesTutor = !tutorSearch || vacina.tutorDisplayName.toLowerCase().includes(tutorSearch)
+      return matchesVeterinarian && matchesPet && matchesTutor
+    })
+  }, [filterPet, filterTutor, filterVeterinarian, vacinas])
+
   const sortedVacinas = useMemo(() => {
     const order: Record<VacinaStatus, number> = { vencida: 0, proxima: 1, ok: 2, "sem-dose": 3 }
-    return [...vacinas].sort((a, b) => {
+    return [...filteredVacinas].sort((a, b) => {
       const statusA = getVacinaStatus(a.proximaDose).status
       const statusB = getVacinaStatus(b.proximaDose).status
       return order[statusA] - order[statusB]
     })
-  }, [vacinas])
+  }, [filteredVacinas])
+
+  const hasFilters = filterVeterinarian !== "todos" || filterPet || filterTutor
+
+  function clearFilters() {
+    setFilterVeterinarian("todos")
+    setFilterPet("")
+    setFilterTutor("")
+  }
+
+  async function handleArchive(vaccineId: string) {
+    if (!user) return
+    try {
+      await archiveAdminVaccine(supabase, vaccineId, user.id)
+      setVacinas((current) => current.filter((vacina) => vacina.id !== vaccineId))
+    } catch {
+      setErrorMessage("Não foi possível arquivar a vacina.")
+    }
+  }
+
+  async function handleDelete(vaccineId: string) {
+    const confirmed = window.confirm("Tem certeza que deseja excluir definitivamente este registro? Esta ação não poderá ser desfeita.")
+    if (!confirmed) return
+
+    try {
+      const result = await safeDeleteAdminVaccine(supabase, vaccineId)
+      if (!result.deleted) {
+        setErrorMessage(result.reason || "Não foi possível excluir este registro com segurança.")
+        return
+      }
+      setVacinas((current) => current.filter((vacina) => vacina.id !== vaccineId))
+    } catch {
+      setErrorMessage("Não foi possível excluir a vacina.")
+    }
+  }
 
   if (loading || isLoadingData) {
     return (
@@ -100,6 +162,43 @@ export default function VacinacaoPage() {
         <h1 className="text-3xl font-bold text-foreground font-serif">Vacinação</h1>
         <p className="text-muted-foreground mt-1">Controle real de vacinas registradas pelos veterinários</p>
         {errorMessage && <p className="mt-2 text-sm text-destructive">{errorMessage}</p>}
+      </div>
+
+      <div className="grid gap-3 rounded-xl border border-border bg-card p-4 md:grid-cols-[1fr_1fr_1fr_auto]">
+        <select
+          value={filterVeterinarian}
+          onChange={(event) => setFilterVeterinarian(event.target.value)}
+          className="h-10 rounded-lg border border-input bg-background px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+        >
+          <option value="todos">Todos os veterinários</option>
+          {veterinarios.map((vet) => (
+            <option key={vet.id} value={vet.id}>
+              {vet.full_name || "Veterinário sem nome"}
+            </option>
+          ))}
+        </select>
+        <input
+          type="search"
+          placeholder="Buscar pet"
+          value={filterPet}
+          onChange={(event) => setFilterPet(event.target.value)}
+          className="h-10 rounded-lg border border-input bg-background px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+        />
+        <input
+          type="search"
+          placeholder="Buscar tutor"
+          value={filterTutor}
+          onChange={(event) => setFilterTutor(event.target.value)}
+          className="h-10 rounded-lg border border-input bg-background px-3 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+        />
+        <button
+          type="button"
+          onClick={clearFilters}
+          disabled={!hasFilters}
+          className="h-10 rounded-lg border border-border px-4 text-sm font-medium text-card-foreground transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          Limpar filtros
+        </button>
       </div>
 
       {sortedVacinas.length > 0 ? (
@@ -120,6 +219,7 @@ export default function VacinacaoPage() {
                   <th className="text-left px-4 py-3 text-sm font-semibold text-card-foreground">Valor</th>
                   <th className="text-left px-4 py-3 text-sm font-semibold text-card-foreground">Resposta do tutor</th>
                   <th className="text-left px-4 py-3 text-sm font-semibold text-card-foreground">Status</th>
+                  <th className="text-right px-4 py-3 text-sm font-semibold text-card-foreground">Ações</th>
                 </tr>
               </thead>
               <tbody>
@@ -155,6 +255,26 @@ export default function VacinacaoPage() {
                           {statusInfo.status === "ok" && <CheckCircle className="h-3 w-3" />}
                           {statusInfo.label}
                         </span>
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex justify-end gap-2">
+                          <button
+                            type="button"
+                            onClick={() => handleArchive(vacina.id)}
+                            className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-muted text-muted-foreground transition-colors hover:bg-muted/80"
+                            title="Arquivar vacina"
+                          >
+                            <Archive className="h-4 w-4" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDelete(vacina.id)}
+                            className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-destructive text-destructive-foreground transition-opacity hover:opacity-90"
+                            title="Excluir definitivamente"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   )

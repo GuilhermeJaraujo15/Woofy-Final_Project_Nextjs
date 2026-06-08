@@ -2,11 +2,17 @@
 
 import { useEffect, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
-import { Calendar, Clock, Loader2, Search, Stethoscope } from "lucide-react"
+import { Archive, Calendar, Clock, Loader2, Search, Stethoscope, Trash2 } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { createClient } from "@/lib/supabase"
 import { useAuth } from "@/context/auth-context"
-import { getAdminConsultations, type AdminConsultation, type ConsultaStatus } from "@/lib/clinic-data"
+import {
+  archiveAdminConsultation,
+  getAdminConsultations,
+  safeDeleteAdminConsultation,
+  type AdminConsultation,
+  type ConsultaStatus,
+} from "@/lib/clinic-data"
 
 const statusColors: Record<ConsultaStatus, string> = {
   agendada: "bg-secondary text-secondary-foreground",
@@ -69,6 +75,32 @@ export default function ConsultasPage() {
   const formatDate = (dateStr: string) => {
     const date = new Date(`${dateStr}T00:00:00`)
     return date.toLocaleDateString("pt-BR")
+  }
+
+  async function handleArchive(consultaId: string) {
+    if (!user) return
+    try {
+      await archiveAdminConsultation(supabase, consultaId, user.id)
+      setConsultas((current) => current.filter((consulta) => consulta.id !== consultaId))
+    } catch {
+      setErrorMessage("Não foi possível arquivar a consulta.")
+    }
+  }
+
+  async function handleDelete(consultaId: string) {
+    const confirmed = window.confirm("Tem certeza que deseja excluir definitivamente este registro? Esta ação não poderá ser desfeita.")
+    if (!confirmed) return
+
+    try {
+      const result = await safeDeleteAdminConsultation(supabase, consultaId)
+      if (!result.deleted) {
+        setErrorMessage(result.reason || "Não foi possível excluir esta consulta com segurança.")
+        return
+      }
+      setConsultas((current) => current.filter((consulta) => consulta.id !== consultaId))
+    } catch {
+      setErrorMessage("Não foi possível excluir a consulta.")
+    }
   }
   const formatCurrency = (value: number | null) => {
     if (value == null) return "Não definido"
@@ -143,6 +175,7 @@ export default function ConsultasPage() {
                     Valor
                   </th>
                   <th className="text-left px-4 py-3 text-sm font-semibold text-card-foreground">Status</th>
+                  <th className="text-right px-4 py-3 text-sm font-semibold text-card-foreground">Ações</th>
                 </tr>
               </thead>
               <tbody>
@@ -179,6 +212,26 @@ export default function ConsultasPage() {
                       <span className={cn("px-3 py-1 rounded-full text-xs font-medium", statusColors[consulta.status])}>
                         {statusLabels[consulta.status]}
                       </span>
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="flex justify-end gap-2">
+                        <button
+                          type="button"
+                          onClick={() => handleArchive(consulta.id)}
+                          className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-muted text-muted-foreground transition-colors hover:bg-muted/80"
+                          title="Arquivar consulta"
+                        >
+                          <Archive className="h-4 w-4" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleDelete(consulta.id)}
+                          className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-destructive text-destructive-foreground transition-opacity hover:opacity-90"
+                          title="Excluir definitivamente"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}

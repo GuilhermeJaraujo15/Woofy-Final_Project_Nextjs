@@ -23,13 +23,16 @@ import {
 } from "@/components/ui/select"
 import { Plus, ChevronLeft, ChevronRight, CalendarDays, Clock, User, Loader2 } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { getMaxFutureDateInputValue, getTodayDateInputValue, validateFutureSchedulingDate } from "@/lib/date-validation"
 import { createClient } from "@/lib/supabase"
 import {
+  archiveAdminAppointment,
   assignVeterinarianToAppointment,
   createAdminAppointment,
   getAdminAppointments,
   getAdminPets,
   getApprovedVeterinarians,
+  safeDeleteAdminAppointment,
   updateAppointmentStatus,
   type AdminAppointment,
   type AdminPet,
@@ -89,6 +92,8 @@ export default function AgendaPage() {
     veterinarioId: "",
     tipo: "",
   })
+  const minSchedulingDate = getTodayDateInputValue()
+  const maxSchedulingDate = getMaxFutureDateInputValue(3)
 
   const vetColors = useMemo(() => {
     return veterinarios.reduce<Record<string, string>>((acc, vet, index) => {
@@ -153,6 +158,11 @@ export default function AgendaPage() {
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault()
+    const dateError = validateFutureSchedulingDate(formData.data)
+    if (dateError) {
+      addToast(dateError, "error")
+      return
+    }
 
     const selectedVet = veterinarios.find((vet) => vet.id === formData.veterinarioId)
     setIsSaving(true)
@@ -220,6 +230,37 @@ export default function AgendaPage() {
       addToast("Veterinário atribuído com sucesso!")
     } catch {
       addToast("Não foi possível atribuir o veterinário.", "error")
+    }
+  }
+
+  const handleArchiveAppointment = async (appointment: AdminAppointment) => {
+    if (!user) return
+
+    try {
+      await archiveAdminAppointment(supabase, appointment.id, user.id)
+      setAgendamentos((current) => current.filter((item) => item.id !== appointment.id))
+      setSelectedAgendamento(null)
+      addToast("Agendamento arquivado com sucesso!")
+    } catch {
+      addToast("Não foi possível arquivar o agendamento.", "error")
+    }
+  }
+
+  const handleDeleteAppointment = async (appointment: AdminAppointment) => {
+    const confirmed = window.confirm("Tem certeza que deseja excluir definitivamente este registro? Esta ação não poderá ser desfeita.")
+    if (!confirmed) return
+
+    try {
+      const result = await safeDeleteAdminAppointment(supabase, appointment.id)
+      if (!result.deleted) {
+        addToast(result.reason || "Não foi possível excluir este agendamento com segurança.", "error")
+        return
+      }
+      setAgendamentos((current) => current.filter((item) => item.id !== appointment.id))
+      setSelectedAgendamento(null)
+      addToast("Agendamento excluído definitivamente.")
+    } catch {
+      addToast("Não foi possível excluir o agendamento.", "error")
     }
   }
 
@@ -295,6 +336,8 @@ export default function AgendaPage() {
                 <Input
                   id="data"
                   type="date"
+                  min={minSchedulingDate}
+                  max={maxSchedulingDate}
                   value={formData.data}
                   onChange={(e) => setFormData((prev) => ({ ...prev, data: e.target.value }))}
                   required
@@ -555,7 +598,13 @@ export default function AgendaPage() {
                 </div>
               </div>
 
-              <div className="flex justify-end">
+              <div className="flex flex-wrap justify-end gap-2">
+                <Button variant="outline" onClick={() => handleArchiveAppointment(selectedAgendamento)}>
+                  Arquivar
+                </Button>
+                <Button variant="destructive" onClick={() => handleDeleteAppointment(selectedAgendamento)}>
+                  Excluir definitivamente
+                </Button>
                 <Button variant="outline" onClick={() => setSelectedAgendamento(null)}>
                   Fechar
                 </Button>

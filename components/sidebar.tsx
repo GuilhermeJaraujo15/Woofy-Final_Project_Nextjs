@@ -10,6 +10,7 @@ import {
   ClipboardList,
   DollarSign,
   CalendarDays,
+  Archive,
   Home,
   LogOut,
   Menu,
@@ -30,6 +31,7 @@ const navItems = [
   { href: "/historico", label: "Histórico", icon: ClipboardList },
   { href: "/financeiro", label: "Financeiro", icon: DollarSign },
   { href: "/agenda", label: "Agenda", icon: CalendarDays },
+  { href: "/arquivados", label: "Arquivados", icon: Archive },
 ]
 
 export function Sidebar() {

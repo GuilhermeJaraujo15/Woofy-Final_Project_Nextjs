@@ -16,12 +16,14 @@ import {
   Rabbit,
   Phone,
   Loader2,
+  Trash2,
 } from "lucide-react"
 import {
   archiveAdminPet,
   createAdminPet,
   getAdminPets,
   getClinicProfiles,
+  safeDeleteAdminPet,
   updateAdminPet,
   type AdminPet,
   type Especie,
@@ -67,10 +69,12 @@ function PetCard({
   pet,
   onEdit,
   onArchive,
+  onDelete,
 }: {
   pet: AdminPet
   onEdit: (pet: AdminPet) => void
   onArchive: (id: string) => void
+  onDelete: (id: string) => void
 }) {
   const Icon = especieIcons[pet.especie]
 
@@ -118,6 +122,13 @@ function PetCard({
           title="Arquivar pet"
         >
           <Archive className="h-4 w-4" />
+        </button>
+        <button
+          onClick={() => onDelete(pet.id)}
+          className="flex items-center justify-center px-3 py-2 bg-destructive text-destructive-foreground rounded-lg hover:opacity-90 transition-opacity"
+          title="Excluir definitivamente"
+        >
+          <Trash2 className="h-4 w-4" />
         </button>
       </div>
     </div>
@@ -443,6 +454,25 @@ export default function PetsPage() {
     }
   }
 
+  const handleDelete = async (id: string) => {
+    const confirmed = window.confirm(
+      "Este pet pode ter consultas, vacinas, exames, histórico médico e lançamentos financeiros vinculados. Excluir definitivamente pode afetar esses registros. Deseja continuar?",
+    )
+    if (!confirmed) return
+
+    try {
+      const result = await safeDeleteAdminPet(supabase, id)
+      if (!result.deleted) {
+        addToast(result.reason || "Não foi possível excluir este pet com segurança.", "error")
+        return
+      }
+      setPets((prev) => prev.filter((pet) => pet.id !== id))
+      addToast("Pet excluído definitivamente.")
+    } catch {
+      addToast("Não foi possível excluir o pet.", "error")
+    }
+  }
+
   if (loading || isLoadingData) {
     return (
       <div className="flex min-h-[360px] items-center justify-center">
@@ -502,6 +532,7 @@ export default function PetsPage() {
               pet={pet}
               onEdit={handleOpenModal}
               onArchive={handleArchive}
+              onDelete={handleDelete}
             />
           ))}
         </div>

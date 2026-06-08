@@ -10,6 +10,7 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { useAuth } from "@/context/auth-context"
 import { createClient } from "@/lib/supabase"
+import { getMaxFutureDateInputValue, getTodayDateInputValue, validateFutureSchedulingDate } from "@/lib/date-validation"
 import {
   archiveVeterinarianAppointment,
   createExamRecord,
@@ -78,6 +79,8 @@ export default function VeterinarioPage() {
 
   const selectedAppointment = agendamentos.find((item) => item.id === selectedAppointmentId) || null
   const veterinarianName = profile?.full_name || user?.email || "Veterinário"
+  const minSchedulingDate = getTodayDateInputValue()
+  const maxSchedulingDate = getMaxFutureDateInputValue(3)
   const activeStatusAppointments = agendamentos.filter((appointment) =>
     appointment.status === "agendado" || appointment.status === "confirmado"
   )
@@ -281,6 +284,16 @@ export default function VeterinarioPage() {
       setErrorMessage("Informe data e horario propostos para a vacina.")
       return
     }
+    const vaccineDateError = validateFutureSchedulingDate(vaccineForm.dataAgendada)
+    if (vaccineDateError) {
+      setErrorMessage(vaccineDateError)
+      return
+    }
+    const nextDoseDateError = vaccineForm.proximaDose ? validateFutureSchedulingDate(vaccineForm.proximaDose) : null
+    if (nextDoseDateError) {
+      setErrorMessage(nextDoseDateError)
+      return
+    }
     if (!vaccineForm.vacina.trim() || !Number.isFinite(vaccineValue) || vaccineValue <= 0) {
       setErrorMessage("Informe a vacina e um valor válido.")
       return
@@ -332,6 +345,11 @@ export default function VeterinarioPage() {
     const examValue = Number(examForm.valor)
     if (!examForm.dataAgendada || !examForm.horarioAgendado) {
       setErrorMessage("Informe data e horário propostos para o exame.")
+      return
+    }
+    const examDateError = validateFutureSchedulingDate(examForm.dataAgendada)
+    if (examDateError) {
+      setErrorMessage(examDateError)
       return
     }
     if (!examForm.categoria || !examForm.tipo) {
@@ -645,6 +663,8 @@ export default function VeterinarioPage() {
             <Field
               label="Data proposta"
               type="date"
+              min={minSchedulingDate}
+              max={maxSchedulingDate}
               value={vaccineForm.dataAgendada}
               onChange={(value) => setVaccineForm({ ...vaccineForm, dataAgendada: value })}
               required
@@ -659,6 +679,8 @@ export default function VeterinarioPage() {
             <Field
               label="Próxima dose"
               type="date"
+              min={minSchedulingDate}
+              max={maxSchedulingDate}
               value={vaccineForm.proximaDose}
               onChange={(value) => setVaccineForm({ ...vaccineForm, proximaDose: value })}
             />
@@ -776,6 +798,8 @@ export default function VeterinarioPage() {
               <Field
                 label="Data proposta"
                 type="date"
+                min={minSchedulingDate}
+                max={maxSchedulingDate}
                 value={examForm.dataAgendada}
                 onChange={(value) => setExamForm({ ...examForm, dataAgendada: value })}
                 required
@@ -900,18 +924,22 @@ function Field({
   onChange,
   type = "text",
   required = false,
+  min,
+  max,
 }: {
   label: string
   value: string
   onChange: (value: string) => void
   type?: string
   required?: boolean
+  min?: string
+  max?: string
 }) {
   const id = label.toLowerCase().replace(/\s+/g, "-")
   return (
     <div className="space-y-2">
       <Label htmlFor={id}>{label}</Label>
-      <Input id={id} type={type} required={required} value={value} onChange={(event) => onChange(event.target.value)} />
+      <Input id={id} type={type} required={required} min={min} max={max} value={value} onChange={(event) => onChange(event.target.value)} />
     </div>
   )
 }

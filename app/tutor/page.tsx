@@ -20,6 +20,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { useAuth } from "@/context/auth-context"
 import { useApp } from "@/context/app-context"
 import { createClient } from "@/lib/supabase"
+import { getMaxFutureDateInputValue, getTodayDateInputValue, validateFutureSchedulingDate } from "@/lib/date-validation"
 import {
   archiveTutorAppointment,
   cancelTutorExam,
@@ -147,6 +148,8 @@ export default function TutorPage() {
   const [isSavingAppointment, setIsSavingAppointment] = useState(false)
 
   const tutorName = profile?.full_name || user?.email || "Tutor"
+  const minSchedulingDate = getTodayDateInputValue()
+  const maxSchedulingDate = getMaxFutureDateInputValue(3)
 
   useEffect(() => {
     if (loading) return
@@ -313,6 +316,12 @@ export default function TutorPage() {
     const selectedVeterinarian = veterinarians.find((vet) => vet.id === appointmentForm.veterinario_id) || null
     if (!selectedVeterinarian) {
       addToast("Escolha o veterinário para o atendimento.", "error")
+      return
+    }
+
+    const dateError = validateFutureSchedulingDate(appointmentForm.data)
+    if (dateError) {
+      addToast(dateError, "error")
       return
     }
 
@@ -614,7 +623,7 @@ export default function TutorPage() {
                 </select>
               </div>
               <div className="grid gap-4 sm:grid-cols-2">
-                <Field label="Data" type="date" value={appointmentForm.data} onChange={(value) => setAppointmentForm({ ...appointmentForm, data: value })} required />
+                <Field label="Data" type="date" min={minSchedulingDate} max={maxSchedulingDate} value={appointmentForm.data} onChange={(value) => setAppointmentForm({ ...appointmentForm, data: value })} required />
                 <Field label="Horário" type="time" value={appointmentForm.horario_inicio} onChange={(value) => setAppointmentForm({ ...appointmentForm, horario_inicio: value })} required />
               </div>
               <div className="space-y-2">
@@ -910,18 +919,22 @@ function Field({
   onChange,
   type = "text",
   required = false,
+  min,
+  max,
 }: {
   label: string
   value: string
   onChange: (value: string) => void
   type?: string
   required?: boolean
+  min?: string
+  max?: string
 }) {
   const id = label.toLowerCase().replace(/\s+/g, "-")
   return (
     <div className="space-y-2">
       <Label htmlFor={id}>{label}</Label>
-      <Input id={id} type={type} required={required} value={value} onChange={(event) => onChange(event.target.value)} />
+      <Input id={id} type={type} required={required} min={min} max={max} value={value} onChange={(event) => onChange(event.target.value)} />
     </div>
   )
 }
