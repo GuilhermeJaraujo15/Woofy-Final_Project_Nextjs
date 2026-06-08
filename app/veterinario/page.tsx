@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
-import { CalendarDays, CheckCircle2, ClipboardList, Loader2, LogOut, Stethoscope, Syringe } from "lucide-react"
+import { CalendarDays, CheckCircle2, ClipboardList, FileText, Loader2, LogOut, Stethoscope, Syringe } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -12,21 +12,30 @@ import { useAuth } from "@/context/auth-context"
 import { createClient } from "@/lib/supabase"
 import {
   archiveVeterinarianAppointment,
+  createExamRecord,
   createVaccineRecord,
   createConsultationWithHistory,
   getPetsForVeterinarianWorkflow,
+  getVeterinarianExams,
   getVeterinarianVaccines,
   getVeterinarianAppointments,
   restoreVeterinarianAppointment,
+  type AdminExam,
   type AdminVaccine,
   type AgendamentoStatus,
   type ClinicAppointmentDetail,
   type ClinicPetOption,
+  type ExamCategory,
 } from "@/lib/clinic-data"
 
 const today = new Date().toISOString().split("T")[0]
 type ClinicalStateFilter = "todos" | "retorno-pendente" | "retorno-registrado" | "consulta-realizada"
 type OrderFilter = "proximos" | "distantes" | "criados-recentes" | "criados-antigos"
+
+const examTypes: Record<ExamCategory, string[]> = {
+  imagem: ["Raio-X", "Ultrassonografia", "Tomografia", "Ressonância magnética", "Ecocardiograma", "Endoscopia", "Outro"],
+  laboratorial: ["Hemograma", "Bioquímico", "Urina", "Fezes", "Sorologia", "Citologia", "Hormonal", "Parasitológico", "Outro"],
+}
 
 export default function VeterinarioPage() {
   const { user, profile, loading, refreshProfile, signOut } = useAuth()
@@ -35,6 +44,7 @@ export default function VeterinarioPage() {
   const [agendamentos, setAgendamentos] = useState<ClinicAppointmentDetail[]>([])
   const [vaccinePets, setVaccinePets] = useState<ClinicPetOption[]>([])
   const [vaccineRecords, setVaccineRecords] = useState<AdminVaccine[]>([])
+  const [examRecords, setExamRecords] = useState<AdminExam[]>([])
   const [selectedAppointmentId, setSelectedAppointmentId] = useState("")
   const [medicalReturn, setMedicalReturn] = useState("")
   const [medicalReturnDate, setMedicalReturnDate] = useState(today)
@@ -46,12 +56,23 @@ export default function VeterinarioPage() {
     horarioAgendado: "",
     valor: "95",
   })
+  const [examForm, setExamForm] = useState({
+    petId: "",
+    categoria: "imagem" as ExamCategory,
+    tipo: "Raio-X",
+    nomePersonalizado: "",
+    valor: "160",
+    dataAgendada: "",
+    horarioAgendado: "",
+    observacoes: "",
+  })
   const [statusFilter, setStatusFilter] = useState<"todos" | AgendamentoStatus>("todos")
   const [clinicalStateFilter, setClinicalStateFilter] = useState<ClinicalStateFilter>("todos")
   const [orderFilter, setOrderFilter] = useState<OrderFilter>("proximos")
   const [isLoadingData, setIsLoadingData] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
   const [isSavingVaccine, setIsSavingVaccine] = useState(false)
+  const [isSavingExam, setIsSavingExam] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
 
@@ -92,15 +113,23 @@ export default function VeterinarioPage() {
     await refreshProfile(user.id)
 
     try {
-      const [appointments, petsForVaccines, vaccines] = await Promise.all([
+      const [appointments, petsForVaccines, vaccines, exams] = await Promise.all([
         getVeterinarianAppointments(supabase, user.id),
         getPetsForVeterinarianWorkflow(supabase, user.id),
         getVeterinarianVaccines(supabase, user.id),
+        getVeterinarianExams(supabase, user.id),
       ])
       setAgendamentos(appointments)
       setVaccinePets(petsForVaccines)
       setVaccineRecords(vaccines)
+      setExamRecords(exams)
       setVaccineForm((current) => ({
+        ...current,
+        petId: current.petId && petsForVaccines.some((pet) => pet.id === current.petId)
+          ? current.petId
+          : petsForVaccines[0]?.id || "",
+      }))
+      setExamForm((current) => ({
         ...current,
         petId: current.petId && petsForVaccines.some((pet) => pet.id === current.petId)
           ? current.petId
@@ -288,6 +317,70 @@ export default function VeterinarioPage() {
       setErrorMessage("Não foi possível registrar a vacina.")
     } finally {
       setIsSavingVaccine(false)
+    }
+  }
+
+  async function handleCreateExam(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    if (!user) return
+
+    const selectedPet = vaccinePets.find((pet) => pet.id === examForm.petId)
+    if (!selectedPet) {
+      setErrorMessage("Selecione um pet para registrar o exame.")
+      return
+    }
+    const examValue = Number(examForm.valor)
+    if (!examForm.dataAgendada || !examForm.horarioAgendado) {
+      setErrorMessage("Informe data e horário propostos para o exame.")
+      return
+    }
+    if (!examForm.categoria || !examForm.tipo) {
+      setErrorMessage("Informe a categoria e o tipo do exame.")
+      return
+    }
+    if (examForm.tipo === "Outro" && !examForm.nomePersonalizado.trim()) {
+      setErrorMessage("Informe o nome personalizado do exame.")
+      return
+    }
+    if (!Number.isFinite(examValue) || examValue < 0) {
+      setErrorMessage("Informe um valor válido para o exame.")
+      return
+    }
+
+    setIsSavingExam(true)
+    setMessage(null)
+    setErrorMessage(null)
+
+    try {
+      await createExamRecord(supabase, {
+        petId: selectedPet.id,
+        userId: selectedPet.userId,
+        categoria: examForm.categoria,
+        tipo: examForm.tipo,
+        nomePersonalizado: examForm.nomePersonalizado,
+        observacoes: examForm.observacoes,
+        dataAgendada: examForm.dataAgendada,
+        horarioAgendado: examForm.horarioAgendado,
+        veterinarioId: user.id,
+        valor: examValue,
+        status: "scheduled",
+      })
+      setExamForm({
+        petId: selectedPet.id,
+        categoria: "imagem",
+        tipo: "Raio-X",
+        nomePersonalizado: "",
+        valor: "160",
+        dataAgendada: "",
+        horarioAgendado: "",
+        observacoes: "",
+      })
+      setExamRecords(await getVeterinarianExams(supabase, user.id))
+      setMessage(`Exame recomendado para ${selectedPet.nome}.`)
+    } catch {
+      setErrorMessage("Não foi possível registrar o exame.")
+    } finally {
+      setIsSavingExam(false)
     }
   }
 
@@ -605,6 +698,144 @@ export default function VeterinarioPage() {
             <EmptyState text="Nenhuma vacina registrada." />
           )}
         </Panel>
+
+        <Panel title="Registrar Exames" icon={FileText}>
+          <form onSubmit={handleCreateExam} className="space-y-4">
+            <div className="grid gap-4 md:grid-cols-[1.2fr_1fr_1fr_1fr]">
+              <div className="space-y-2">
+                <Label htmlFor="examPet">Pet</Label>
+                <select
+                  id="examPet"
+                  required
+                  value={examForm.petId}
+                  onChange={(event) => setExamForm({ ...examForm, petId: event.target.value })}
+                  className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                >
+                  <option value="">Selecione</option>
+                  {vaccinePets.map((pet) => (
+                    <option key={pet.id} value={pet.id}>
+                      {pet.nome} - {pet.tutorDisplayName}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="examCategory">Categoria</Label>
+                <select
+                  id="examCategory"
+                  required
+                  value={examForm.categoria}
+                  onChange={(event) => {
+                    const categoria = event.target.value as ExamCategory
+                    setExamForm({ ...examForm, categoria, tipo: examTypes[categoria][0], nomePersonalizado: "" })
+                  }}
+                  className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                >
+                  <option value="imagem">Exame de imagem</option>
+                  <option value="laboratorial">Exame laboratorial</option>
+                </select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="examType">Tipo do exame</Label>
+                <select
+                  id="examType"
+                  required
+                  value={examForm.tipo}
+                  onChange={(event) => setExamForm({ ...examForm, tipo: event.target.value })}
+                  className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                >
+                  {examTypes[examForm.categoria].map((type) => (
+                    <option key={type} value={type}>
+                      {type}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <Field
+                label="Valor"
+                type="number"
+                value={examForm.valor}
+                onChange={(value) => setExamForm({ ...examForm, valor: value })}
+                required
+              />
+            </div>
+
+            {examForm.tipo === "Outro" && (
+              <Field
+                label="Nome personalizado"
+                value={examForm.nomePersonalizado}
+                onChange={(value) => setExamForm({ ...examForm, nomePersonalizado: value })}
+                required
+              />
+            )}
+
+            <div className="grid gap-4 md:grid-cols-2">
+              <Field
+                label="Data proposta"
+                type="date"
+                value={examForm.dataAgendada}
+                onChange={(value) => setExamForm({ ...examForm, dataAgendada: value })}
+                required
+              />
+              <Field
+                label="Horário proposto"
+                type="time"
+                value={examForm.horarioAgendado}
+                onChange={(value) => setExamForm({ ...examForm, horarioAgendado: value })}
+                required
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="examObservations">Observações clínicas</Label>
+              <Textarea
+                id="examObservations"
+                value={examForm.observacoes}
+                onChange={(event) => setExamForm({ ...examForm, observacoes: event.target.value })}
+                className="min-h-20"
+              />
+            </div>
+
+            <Button type="submit" disabled={isSavingExam || vaccinePets.length === 0} className="gap-2">
+              {isSavingExam && <Loader2 className="h-4 w-4 animate-spin" />}
+              Salvar exame
+            </Button>
+          </form>
+        </Panel>
+
+        <Panel title="Exames registrados" icon={FileText}>
+          {examRecords.length > 0 ? (
+            <div className="grid gap-3 md:grid-cols-2">
+              {examRecords.map((exam) => (
+                <div key={exam.id} className="rounded-lg border border-border bg-background p-4">
+                  <p className="font-semibold text-foreground">{exam.petNome} - {exam.examDisplayName}</p>
+                  <p className="text-sm text-muted-foreground">Tutor: {exam.tutorDisplayName}</p>
+                  <p className="text-sm text-muted-foreground">Categoria: {examCategoryLabel(exam.categoria)}</p>
+                  <p className="text-sm text-muted-foreground">Status: {examStatusLabel(exam.status)}</p>
+                  <p className="text-sm text-muted-foreground">
+                    Proposto para: {exam.dataAgendada ? `${exam.dataAgendada} ${exam.horarioAgendado || ""}` : "não definido"}
+                  </p>
+                  {exam.observacoes && <p className="text-sm text-muted-foreground">Observações: {exam.observacoes}</p>}
+                  <p className="text-sm font-medium text-foreground">{tutorExamResponseLabel(exam)}</p>
+                  {exam.tutorResposta === "cancelada" && (
+                    <p className="text-sm text-muted-foreground">
+                      Motivo da recusa: {exam.tutorMotivoCancelamento || "Não informado"}
+                    </p>
+                  )}
+                  <p className="text-sm text-muted-foreground">
+                    Valor: {new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(exam.valor)}
+                  </p>
+                  <p className="text-sm text-muted-foreground">Criado em: {new Date(exam.createdAt).toLocaleDateString("pt-BR")}</p>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <EmptyState text="Nenhum exame registrado." />
+          )}
+        </Panel>
       </main>
     </div>
   )
@@ -725,9 +956,29 @@ function vaccineStatusLabel(status: AdminVaccine["status"]) {
   return labels[status] || status
 }
 
+function examStatusLabel(status: AdminExam["status"]) {
+  const labels: Record<AdminExam["status"], string> = {
+    recommended: "Recomendado",
+    scheduled: "Pendente de confirmação",
+    confirmed: "Confirmado",
+    cancelled: "Recusado",
+  }
+  return labels[status] || status
+}
+
+function examCategoryLabel(category: ExamCategory) {
+  return category === "imagem" ? "Exame de imagem" : "Exame laboratorial"
+}
+
 function tutorVaccineResponseLabel(vacina: AdminVaccine) {
   if (vacina.tutorResposta === "confirmada") return "Confirmada pelo tutor"
   if (vacina.tutorResposta === "cancelada") return "Cancelada pelo tutor"
+  return "Aguardando resposta do tutor"
+}
+
+function tutorExamResponseLabel(exam: AdminExam) {
+  if (exam.tutorResposta === "confirmada") return "Confirmado pelo tutor"
+  if (exam.tutorResposta === "cancelada") return "Recusado pelo tutor"
   return "Aguardando resposta do tutor"
 }
 

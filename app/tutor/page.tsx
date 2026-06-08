@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation"
 import {
   CalendarDays,
   ClipboardList,
+  FileText,
   Loader2,
   LogOut,
   PawPrint,
@@ -21,16 +22,20 @@ import { useApp } from "@/context/app-context"
 import { createClient } from "@/lib/supabase"
 import {
   archiveTutorAppointment,
+  cancelTutorExam,
   cancelTutorVaccine,
+  confirmTutorExam,
   confirmTutorVaccine,
   createTutorAppointment,
   getApprovedVeterinarians,
   getTutorAppointments,
   getTutorConsultationFeedback,
+  getTutorExams,
   getTutorFinancialSummary,
   getTutorPetHistory,
   getTutorVaccines,
   restoreTutorAppointment,
+  type AdminExam,
   type AdminHistoryEntry,
   type AdminVaccine,
   type ClinicAppointment,
@@ -100,6 +105,20 @@ function vaccineStatusLabel(status: AdminVaccine["status"]) {
   return labels[status] || status
 }
 
+function examStatusLabel(status: AdminExam["status"]) {
+  const labels: Record<AdminExam["status"], string> = {
+    recommended: "Recomendado",
+    scheduled: "Pendente de confirmação",
+    confirmed: "Confirmado",
+    cancelled: "Recusado",
+  }
+  return labels[status] || status
+}
+
+function examCategoryLabel(category: AdminExam["categoria"]) {
+  return category === "imagem" ? "Exame de imagem" : "Exame laboratorial"
+}
+
 function readableError(error: unknown) {
   if (error instanceof Error) return error.message
   if (typeof error === "object" && error !== null) return JSON.stringify(error)
@@ -115,10 +134,12 @@ export default function TutorPage() {
   const [agendamentos, setAgendamentos] = useState<ClinicAppointment[]>([])
   const [veterinarians, setVeterinarians] = useState<VeterinarianOption[]>([])
   const [vacinas, setVacinas] = useState<AdminVaccine[]>([])
+  const [exames, setExames] = useState<AdminExam[]>([])
   const [feedbacks, setFeedbacks] = useState<TutorConsultationFeedback[]>([])
   const [historico, setHistorico] = useState<AdminHistoryEntry[]>([])
-  const [financialSummary, setFinancialSummary] = useState({ consultationTotal: 0, vaccineTotal: 0, total: 0 })
+  const [financialSummary, setFinancialSummary] = useState({ consultationTotal: 0, vaccineTotal: 0, examTotal: 0, total: 0 })
   const [vaccineCancelForms, setVaccineCancelForms] = useState<Record<string, { isOpen: boolean; reason: string }>>({})
+  const [examCancelForms, setExamCancelForms] = useState<Record<string, { isOpen: boolean; reason: string }>>({})
   const [petForm, setPetForm] = useState(initialPetForm)
   const [appointmentForm, setAppointmentForm] = useState(initialAppointmentForm)
   const [isLoadingData, setIsLoadingData] = useState(true)
@@ -143,6 +164,7 @@ export default function TutorPage() {
           petsResult,
           agendamentosResult,
           vacinasResult,
+          examesResult,
           feedbacksResult,
           historicoResult,
           financialSummaryResult,
@@ -151,6 +173,7 @@ export default function TutorPage() {
           supabase.from("pets").select("*").eq("user_id", user.id).eq("arquivado", false).order("created_at", { ascending: false }),
           getTutorAppointments(supabase, user.id),
           getTutorVaccines(supabase, user.id),
+          getTutorExams(supabase, user.id),
           getTutorConsultationFeedback(supabase, user.id),
           getTutorPetHistory(supabase, user.id),
           getTutorFinancialSummary(supabase, user.id),
@@ -161,6 +184,7 @@ export default function TutorPage() {
           petsResult.status === "fulfilled" && petsResult.value.error ? petsResult.value.error : null,
           agendamentosResult.status === "rejected" ? agendamentosResult.reason : null,
           vacinasResult.status === "rejected" ? vacinasResult.reason : null,
+          examesResult.status === "rejected" ? examesResult.reason : null,
           feedbacksResult.status === "rejected" ? feedbacksResult.reason : null,
           historicoResult.status === "rejected" ? historicoResult.reason : null,
           financialSummaryResult.status === "rejected" ? financialSummaryResult.reason : null,
@@ -175,12 +199,13 @@ export default function TutorPage() {
         setPets(petsResult.status === "fulfilled" ? ((petsResult.value.data || []) as PetRow[]) : [])
         setAgendamentos(agendamentosResult.status === "fulfilled" ? agendamentosResult.value : [])
         setVacinas(vacinasResult.status === "fulfilled" ? vacinasResult.value : [])
+        setExames(examesResult.status === "fulfilled" ? examesResult.value : [])
         setFeedbacks(feedbacksResult.status === "fulfilled" ? feedbacksResult.value : [])
         setHistorico(historicoResult.status === "fulfilled" ? historicoResult.value : [])
         setFinancialSummary(
           financialSummaryResult.status === "fulfilled"
             ? financialSummaryResult.value
-            : { consultationTotal: 0, vaccineTotal: 0, total: 0 }
+            : { consultationTotal: 0, vaccineTotal: 0, examTotal: 0, total: 0 }
         )
         const loadedVeterinarians = veterinariansResult.status === "fulfilled" ? veterinariansResult.value : []
         setVeterinarians(loadedVeterinarians)
@@ -396,6 +421,49 @@ export default function TutorPage() {
     }
   }
 
+  async function handleConfirmExam(examId: string) {
+    if (!user) return
+
+    try {
+      const updatedExam = await confirmTutorExam(supabase, {
+        examId,
+        userId: user.id,
+      })
+      setExames((current) => current.map((exam) => (exam.id === examId ? updatedExam : exam)))
+      setFinancialSummary(await getTutorFinancialSummary(supabase, user.id))
+      addToast("Exame confirmado com sucesso.")
+    } catch {
+      addToast("Não foi possível confirmar o exame.", "error")
+    }
+  }
+
+  async function handleCancelExam(examId: string) {
+    if (!user) return
+
+    const reason = examCancelForms[examId]?.reason.trim() || ""
+    if (!reason) {
+      addToast("Informe o motivo da recusa.", "error")
+      return
+    }
+
+    try {
+      const updatedExam = await cancelTutorExam(supabase, {
+        examId,
+        userId: user.id,
+        reason,
+      })
+      setExames((current) => current.map((exam) => (exam.id === examId ? updatedExam : exam)))
+      setExamCancelForms((current) => ({
+        ...current,
+        [examId]: { isOpen: false, reason: "" },
+      }))
+      setFinancialSummary(await getTutorFinancialSummary(supabase, user.id))
+      addToast("Exame recusado com sucesso.")
+    } catch {
+      addToast("Não foi possível recusar o exame.", "error")
+    }
+  }
+
   if (loading || isLoadingData) {
     return (
       <div className="min-h-screen bg-[#F5F4EE] dark:bg-slate-900 flex items-center justify-center">
@@ -429,10 +497,11 @@ export default function TutorPage() {
           </p>
         </section>
 
-        <section className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <section className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
           <SummaryCard icon={PawPrint} label="Meus Pets" value={pets.length} />
           <SummaryCard icon={CalendarDays} label="Meus Agendamentos" value={activeAppointments.length} />
           <SummaryCard icon={Syringe} label="Vacinas" value={vacinas.length} />
+          <SummaryCard icon={FileText} label="Exames" value={exames.length} />
           <SummaryCard icon={ClipboardList} label="Retorno Médico" value={medicalReturns.length} />
         </section>
 
@@ -585,9 +654,10 @@ export default function TutorPage() {
 
         <section className="grid gap-6 lg:grid-cols-2">
           <Panel title="Resumo financeiro" icon={ClipboardList}>
-            <div className="grid gap-3 sm:grid-cols-3">
+            <div className="grid gap-3 sm:grid-cols-4">
               <InfoRow title="Consultas" subtitle={formatCurrency(financialSummary.consultationTotal)} />
               <InfoRow title="Vacinas" subtitle={formatCurrency(financialSummary.vaccineTotal)} />
+              <InfoRow title="Exames" subtitle={formatCurrency(financialSummary.examTotal)} />
               <InfoRow title="Total" subtitle={formatCurrency(financialSummary.total)} />
             </div>
           </Panel>
@@ -715,6 +785,95 @@ export default function TutorPage() {
               </div>
             ) : (
               <EmptyState text="Nenhum retorno médico registrado." />
+            )}
+          </Panel>
+        </section>
+
+        <section className="grid gap-6 lg:grid-cols-2">
+          <Panel title="Exames recomendados" icon={FileText}>
+            {exames.length > 0 ? (
+              <div className="space-y-3">
+                {exames.map((exam) => (
+                  <div key={exam.id} className="rounded-lg border border-border bg-background p-4">
+                    <p className="font-semibold text-foreground">{exam.petNome || "Pet"} - {exam.examDisplayName}</p>
+                    <p className="text-sm text-muted-foreground">Categoria: {examCategoryLabel(exam.categoria)}</p>
+                    <p className="text-sm text-muted-foreground">Tipo: {exam.tipo}</p>
+                    {exam.nomePersonalizado && (
+                      <p className="text-sm text-muted-foreground">Nome personalizado: {exam.nomePersonalizado}</p>
+                    )}
+                    <p className="text-sm text-muted-foreground">Veterinário: {exam.veterinarianDisplayName}</p>
+                    <p className="text-sm text-muted-foreground">Status: {examStatusLabel(exam.status)}</p>
+                    <p className="text-sm text-muted-foreground">Valor a pagar: {formatCurrency(exam.valor)}</p>
+                    <p className="text-sm text-muted-foreground">Recomendado em: {exam.dataRecomendada || "não definido"}</p>
+                    <p className="text-sm text-muted-foreground">
+                      Proposto para: {exam.dataAgendada ? `${exam.dataAgendada} ${exam.horarioAgendado || ""}` : "não agendado"}
+                    </p>
+                    {exam.observacoes && (
+                      <p className="text-sm text-muted-foreground">Observações: {exam.observacoes}</p>
+                    )}
+
+                    {(exam.status === "recommended" || exam.status === "scheduled") && (
+                      <div className="mt-3 space-y-3">
+                        <div className="flex flex-wrap gap-2">
+                          <Button type="button" onClick={() => handleConfirmExam(exam.id)}>
+                            Confirmar exame
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() =>
+                              setExamCancelForms((current) => ({
+                                ...current,
+                                [exam.id]: {
+                                  isOpen: !current[exam.id]?.isOpen,
+                                  reason: current[exam.id]?.reason || "",
+                                },
+                              }))
+                            }
+                          >
+                            Recusar exame
+                          </Button>
+                        </div>
+                        {examCancelForms[exam.id]?.isOpen && (
+                          <div className="space-y-2">
+                            <Label htmlFor={`exam-cancel-${exam.id}`}>Motivo da recusa</Label>
+                            <Textarea
+                              id={`exam-cancel-${exam.id}`}
+                              required
+                              value={examCancelForms[exam.id]?.reason || ""}
+                              onChange={(event) =>
+                                setExamCancelForms((current) => ({
+                                  ...current,
+                                  [exam.id]: {
+                                    isOpen: true,
+                                    reason: event.target.value,
+                                  },
+                                }))
+                              }
+                              className="min-h-20"
+                            />
+                            <Button type="button" variant="destructive" onClick={() => handleCancelExam(exam.id)}>
+                              Enviar recusa
+                            </Button>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {exam.tutorResposta === "confirmada" && (
+                      <p className="mt-2 text-sm font-medium text-green-700">Confirmado pelo tutor</p>
+                    )}
+                    {exam.tutorResposta === "cancelada" && (
+                      <div className="mt-2 text-sm text-muted-foreground">
+                        <p className="font-medium text-destructive">Recusado pelo tutor</p>
+                        <p>Motivo da recusa: {exam.tutorMotivoCancelamento || "Não informado"}</p>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <EmptyState text="Nenhum exame recomendado para seus pets." />
             )}
           </Panel>
         </section>

@@ -9,6 +9,8 @@ export type AppointmentStatus = AgendamentoStatus
 export type ConsultaStatus = "agendada" | "realizada" | "cancelada"
 export type HistoricoTipo = "consulta" | "vacina" | "exame"
 export type VaccineStatus = "recommended" | "scheduled" | "confirmed" | "applied" | "cancelled"
+export type ExamCategory = "imagem" | "laboratorial"
+export type ExamStatus = "recommended" | "scheduled" | "confirmed" | "cancelled"
 export type FinancialEntryStatus = "active" | "cancelled"
 
 export interface ProfileSummary {
@@ -95,6 +97,27 @@ interface VacinaRow {
   tutor_resposta?: string | null
   tutor_respondeu_em?: string | null
   tutor_motivo_cancelamento?: string | null
+  created_at: string
+}
+
+interface ExameRow {
+  id: string
+  pet_id: string
+  user_id: string
+  veterinario_id: string
+  categoria: ExamCategory
+  tipo: string
+  nome_personalizado?: string | null
+  observacoes?: string | null
+  valor: number
+  data_recomendada: string
+  data_agendada?: string | null
+  horario_agendado?: string | null
+  status?: ExamStatus | null
+  tutor_resposta?: string | null
+  tutor_respondeu_em?: string | null
+  tutor_motivo_cancelamento?: string | null
+  consulta_id?: string | null
   created_at: string
 }
 
@@ -327,6 +350,31 @@ export interface AdminVaccine {
   createdAt: string
 }
 
+export interface AdminExam {
+  id: string
+  petId: string
+  userId: string
+  petNome: string
+  tutorDisplayName: string
+  categoria: ExamCategory
+  tipo: string
+  nomePersonalizado: string | null
+  examDisplayName: string
+  observacoes: string | null
+  valor: number
+  dataRecomendada: string
+  dataAgendada: string | null
+  horarioAgendado: string | null
+  status: ExamStatus
+  tutorResposta: string | null
+  tutorRespondeuEm: string | null
+  tutorMotivoCancelamento: string | null
+  veterinarioId: string
+  veterinarianDisplayName: string
+  consultaId: string | null
+  createdAt: string
+}
+
 export interface SaveAdminPetInput {
   userId: string
   nome: string
@@ -384,14 +432,36 @@ export interface CreateVaccineRecordInput {
   status?: VaccineStatus
 }
 
+export interface CreateExamRecordInput {
+  petId: string
+  userId: string
+  categoria: ExamCategory
+  tipo: string
+  nomePersonalizado?: string | null
+  observacoes?: string | null
+  valor: number
+  dataAgendada?: string | null
+  horarioAgendado?: string | null
+  veterinarioId: string
+  status?: ExamStatus
+  consultaId?: string | null
+}
+
 export interface TutorVaccineResponseInput {
   vaccineId: string
   userId: string
   reason?: string
 }
 
+export interface TutorExamResponseInput {
+  examId: string
+  userId: string
+  reason?: string
+}
+
 const defaultConsultationPrice = 180
 const defaultVaccinePrice = 95
+const defaultExamPrice = 160
 
 function getDefaultAppointmentPrice(tipo: string) {
   const normalizedType = tipo.toLowerCase()
@@ -644,6 +714,41 @@ function mapVaccineHistoryEntry(
   }
 }
 
+function mapExamHistoryEntry(
+  row: ExameRow,
+  petsById: Record<string, PetRow>,
+  profilesById: Record<string, ProfileRow>,
+): AdminHistoryEntry {
+  const pet = petsById[row.pet_id]
+  const tutorProfileName = profilesById[row.user_id]?.full_name || null
+  const veterinarianProfileName = profilesById[row.veterinario_id]?.full_name || null
+  const date = row.data_agendada || row.data_recomendada || row.created_at.split("T")[0]
+  const categoryLabel = row.categoria === "imagem" ? "Exame de imagem" : "Exame laboratorial"
+
+  return {
+    id: `exame-${row.id}`,
+    petId: row.pet_id,
+    userId: row.user_id,
+    petNome: pet?.nome || "Pet sem nome",
+    tutor: pet?.tutor || tutorProfileName || "Tutor não identificado",
+    tutorProfileName,
+    tutorDisplayName: tutorProfileName || pet?.tutor || "Tutor não identificado",
+    data: date,
+    tipo: "exame",
+    descricao: `${categoryLabel}: ${getExamDisplayName(row)}`,
+    veterinario: veterinarianProfileName || "A definir",
+    consultaId: row.consulta_id || null,
+    agendamentoId: null,
+    consultationReason: null,
+    consultationVeterinarianId: null,
+    consultationStatus: null,
+    consultationTime: row.horario_agendado || null,
+    veterinarianProfileName,
+    veterinarianDisplayName: veterinarianProfileName || "A definir",
+    createdAt: row.created_at,
+  }
+}
+
 function mapVaccine(
   row: VacinaRow,
   petsById: Record<string, PetRow>,
@@ -673,6 +778,45 @@ function mapVaccine(
     veterinarioId: row.veterinario_id || null,
     veterinarianDisplayName: veterinarianProfileName || "A definir",
     valor: row.valor == null ? null : Number(row.valor),
+    createdAt: row.created_at,
+  }
+}
+
+function getExamDisplayName(row: Pick<ExameRow, "tipo" | "nome_personalizado">) {
+  return row.tipo === "Outro" && row.nome_personalizado ? row.nome_personalizado : row.tipo
+}
+
+function mapExam(
+  row: ExameRow,
+  petsById: Record<string, PetRow>,
+  profilesById: Record<string, ProfileRow>,
+): AdminExam {
+  const pet = petsById[row.pet_id]
+  const tutorProfileName = profilesById[row.user_id]?.full_name || null
+  const veterinarianProfileName = profilesById[row.veterinario_id]?.full_name || null
+
+  return {
+    id: row.id,
+    petId: row.pet_id,
+    userId: row.user_id,
+    petNome: pet?.nome || "Pet sem nome",
+    tutorDisplayName: tutorProfileName || pet?.tutor || "Tutor não identificado",
+    categoria: row.categoria,
+    tipo: row.tipo,
+    nomePersonalizado: row.nome_personalizado || null,
+    examDisplayName: getExamDisplayName(row),
+    observacoes: row.observacoes || null,
+    valor: Number(row.valor || 0),
+    dataRecomendada: row.data_recomendada,
+    dataAgendada: row.data_agendada || null,
+    horarioAgendado: row.horario_agendado || null,
+    status: row.status || "recommended",
+    tutorResposta: row.tutor_resposta || null,
+    tutorRespondeuEm: row.tutor_respondeu_em || null,
+    tutorMotivoCancelamento: row.tutor_motivo_cancelamento || null,
+    veterinarioId: row.veterinario_id,
+    veterinarianDisplayName: veterinarianProfileName || "A definir",
+    consultaId: row.consulta_id || null,
     createdAt: row.created_at,
   }
 }
@@ -1259,43 +1403,8 @@ export async function getTutorConsultationFeedback(
 }
 
 export async function getTutorPetHistory(client: SupabaseBrowserClient, userId: string) {
-  const { data, error } = await client
-    .from("historico")
-    .select("*")
-    .eq("user_id", userId)
-    .order("data", { ascending: false })
-    .order("created_at", { ascending: false })
-
-  if (error) throw clinicDataError(error)
-
-  const rows = (data || []) as HistoricoRow[]
-  const petIds = rows.map((entry) => entry.pet_id)
-  const consultationIds = [...new Set(rows.map((entry) => entry.consulta_id).filter(Boolean))] as string[]
-
-  const [{ data: petData, error: petError }, { data: consultationData, error: consultationError }] = await Promise.all([
-    petIds.length > 0
-      ? client.from("pets").select("*").in("id", [...new Set(petIds)])
-      : Promise.resolve({ data: [], error: null }),
-    consultationIds.length > 0
-      ? client.from("consultas").select("*").in("id", consultationIds)
-      : Promise.resolve({ data: [], error: null }),
-  ])
-
-  if (petError) throw clinicDataError(petError)
-  if (consultationError) throw clinicDataError(consultationError)
-
-  const petsById = ((petData || []) as PetRow[]).reduce<Record<string, PetRow>>((acc, pet) => {
-    acc[pet.id] = pet
-    return acc
-  }, {})
-  const consultations = (consultationData || []) as ConsultaRow[]
-  const profilesById = await getProfilesByIds(client, consultations.map((consultation) => consultation.veterinario_id || ""))
-  const consultationsById = consultations.reduce<Record<string, ConsultaRow>>((acc, consultation) => {
-    acc[consultation.id] = consultation
-    return acc
-  }, {})
-
-  return rows.map((entry) => mapHistoryEntry(entry, petsById, profilesById, consultationsById))
+  const entries = await getAdminHistoryEntries(client)
+  return entries.filter((entry) => entry.userId === userId)
 }
 
 export async function createAdminAppointment(client: SupabaseBrowserClient, input: CreateAdminAppointmentInput) {
@@ -1424,6 +1533,27 @@ async function mapVaccineRows(client: SupabaseBrowserClient, rows: VacinaRow[]) 
   return rows.map((vaccine) => mapVaccine(vaccine, petsById, profilesById))
 }
 
+async function mapExamRows(client: SupabaseBrowserClient, rows: ExameRow[]) {
+  const petIds = rows.map((exam) => exam.pet_id)
+  const profileIds = rows.flatMap((exam) => [exam.user_id, exam.veterinario_id])
+
+  const [{ data: petData, error: petError }, profilesById] = await Promise.all([
+    petIds.length > 0
+      ? client.from("pets").select("*").in("id", [...new Set(petIds)])
+      : Promise.resolve({ data: [], error: null }),
+    getProfilesByIds(client, profileIds),
+  ])
+
+  if (petError) throw clinicDataError(petError)
+
+  const petsById = ((petData || []) as PetRow[]).reduce<Record<string, PetRow>>((acc, pet) => {
+    acc[pet.id] = pet
+    return acc
+  }, {})
+
+  return rows.map((exam) => mapExam(exam, petsById, profilesById))
+}
+
 export async function getAdminVaccines(client: SupabaseBrowserClient) {
   const { data, error } = await client
     .from("vacinas")
@@ -1449,6 +1579,36 @@ export async function getTutorVaccines(client: SupabaseBrowserClient, userId: st
   return mapVaccineRows(client, (data || []) as VacinaRow[])
 }
 
+export async function getVeterinarianExams(client: SupabaseBrowserClient, veterinarianId?: string) {
+  let query = client
+    .from("exames")
+    .select("*")
+    .order("data_agendada", { ascending: false, nullsFirst: false })
+    .order("created_at", { ascending: false })
+
+  if (veterinarianId) {
+    query = query.eq("veterinario_id", veterinarianId)
+  }
+
+  const { data, error } = await query
+  if (error) throw clinicDataError(error)
+
+  return mapExamRows(client, (data || []) as ExameRow[])
+}
+
+export async function getTutorExams(client: SupabaseBrowserClient, userId: string) {
+  const { data, error } = await client
+    .from("exames")
+    .select("*")
+    .eq("user_id", userId)
+    .order("data_agendada", { ascending: false, nullsFirst: false })
+    .order("created_at", { ascending: false })
+
+  if (error) throw clinicDataError(error)
+
+  return mapExamRows(client, (data || []) as ExameRow[])
+}
+
 export async function getTutorFinancialSummary(client: SupabaseBrowserClient, userId: string) {
   const { data, error } = await client
     .from("lancamentos")
@@ -1466,11 +1626,15 @@ export async function getTutorFinancialSummary(client: SupabaseBrowserClient, us
   const vaccineTotal = rows
     .filter((entry) => entry.categoria === "Vacinas")
     .reduce((total, entry) => total + Number(entry.valor || 0), 0)
+  const examTotal = rows
+    .filter((entry) => entry.categoria === "Exames")
+    .reduce((total, entry) => total + Number(entry.valor || 0), 0)
 
   return {
     consultationTotal,
     vaccineTotal,
-    total: consultationTotal + vaccineTotal,
+    examTotal,
+    total: consultationTotal + vaccineTotal + examTotal,
   }
 }
 
@@ -1479,10 +1643,10 @@ async function createOrUpdateFinanceEntryFromSource(
   input: {
     userId: string
     descricao: string
-    categoria: "Consultas" | "Vacinas"
+    categoria: "Consultas" | "Vacinas" | "Exames"
     valor: number
     data: string
-    origemTipo: "appointment" | "vaccine"
+    origemTipo: "appointment" | "vaccine" | "exam"
     origemId: string
   },
 ) {
@@ -1558,12 +1722,42 @@ export async function createOrUpdateFinanceEntryFromVaccine(
   })
 }
 
+export async function createOrUpdateFinanceEntryFromExam(
+  client: SupabaseBrowserClient,
+  exam: AdminExam,
+) {
+  if (exam.status !== "confirmed") {
+    return
+  }
+
+  await createOrUpdateFinanceEntryFromSource(client, {
+    userId: exam.userId,
+    descricao: `Exame - ${exam.petNome} - ${exam.examDisplayName}`,
+    categoria: "Exames",
+    valor: exam.valor ?? defaultExamPrice,
+    data: exam.dataAgendada || exam.dataRecomendada || new Date().toISOString().split("T")[0],
+    origemTipo: "exam",
+    origemId: exam.id,
+  })
+}
+
 export async function cancelFinanceEntryFromVaccine(client: SupabaseBrowserClient, vaccineId: string, userId: string) {
   const { error } = await client
     .from("lancamentos")
     .update({ status: "cancelled" as FinancialEntryStatus })
     .eq("origem_tipo", "vaccine")
     .eq("origem_id", vaccineId)
+    .eq("user_id", userId)
+
+  if (error) throw clinicDataError(error)
+}
+
+export async function cancelFinanceEntryFromExam(client: SupabaseBrowserClient, examId: string, userId: string) {
+  const { error } = await client
+    .from("lancamentos")
+    .update({ status: "cancelled" as FinancialEntryStatus })
+    .eq("origem_tipo", "exam")
+    .eq("origem_id", examId)
     .eq("user_id", userId)
 
   if (error) throw clinicDataError(error)
@@ -1668,6 +1862,100 @@ export async function cancelTutorVaccine(client: SupabaseBrowserClient, input: T
   const [vaccine] = await mapVaccineRows(client, [row])
   await cancelFinanceEntryFromVaccine(client, input.vaccineId, input.userId)
   return vaccine
+}
+
+export async function createExamRecord(client: SupabaseBrowserClient, input: CreateExamRecordInput) {
+  const customName = input.nomePersonalizado?.trim() || null
+  if (input.tipo === "Outro" && !customName) {
+    throw new Error("Custom exam name is required.")
+  }
+  if (!Number.isFinite(input.valor) || input.valor < 0) {
+    throw new Error("Exam value must be a positive number.")
+  }
+
+  const { data: petData, error: petError } = await client
+    .from("pets")
+    .select("*")
+    .eq("id", input.petId)
+    .eq("user_id", input.userId)
+    .single()
+
+  if (petError) throw clinicDataError(petError)
+
+  const { data, error } = await client
+    .from("exames")
+    .insert({
+      pet_id: input.petId,
+      user_id: input.userId,
+      veterinario_id: input.veterinarioId,
+      categoria: input.categoria,
+      tipo: input.tipo,
+      nome_personalizado: input.tipo === "Outro" ? customName : null,
+      observacoes: input.observacoes?.trim() || null,
+      valor: input.valor,
+      data_agendada: input.dataAgendada || null,
+      horario_agendado: input.horarioAgendado || null,
+      status: input.status || (input.dataAgendada && input.horarioAgendado ? "scheduled" : "recommended"),
+      data_recomendada: new Date().toISOString().split("T")[0],
+      consulta_id: input.consultaId || null,
+    })
+    .select("*")
+    .single()
+
+  if (error) throw clinicDataError(error)
+
+  const row = data as ExameRow
+  const profilesById = await getProfilesByIds(client, [row.user_id, row.veterinario_id])
+  return mapExam(row, { [input.petId]: petData as PetRow }, profilesById)
+}
+
+export async function confirmTutorExam(client: SupabaseBrowserClient, input: TutorExamResponseInput) {
+  const { data, error } = await client
+    .from("exames")
+    .update({
+      status: "confirmed",
+      tutor_resposta: "confirmada",
+      tutor_respondeu_em: new Date().toISOString(),
+      tutor_motivo_cancelamento: null,
+    })
+    .eq("id", input.examId)
+    .eq("user_id", input.userId)
+    .select("*")
+    .single()
+
+  if (error) throw clinicDataError(error)
+
+  const row = data as ExameRow
+  const [exam] = await mapExamRows(client, [row])
+  await createOrUpdateFinanceEntryFromExam(client, exam)
+  return exam
+}
+
+export async function cancelTutorExam(client: SupabaseBrowserClient, input: TutorExamResponseInput) {
+  const reason = input.reason?.trim()
+  if (!reason) {
+    throw new Error("Cancellation reason is required.")
+  }
+
+  const { data, error } = await client
+    .from("exames")
+    .update({
+      status: "cancelled",
+      tutor_resposta: "cancelada",
+      tutor_respondeu_em: new Date().toISOString(),
+      tutor_motivo_cancelamento: reason,
+    })
+    .eq("id", input.examId)
+    .eq("user_id", input.userId)
+    .select("*")
+    .single()
+
+  if (error) throw clinicDataError(error)
+
+  const row = data as ExameRow
+  const [exam] = await mapExamRows(client, [row])
+  await cancelFinanceEntryFromExam(client, input.examId, input.userId)
+  return exam
 }
 
 export async function getAdminUpcomingAppointments(client: SupabaseBrowserClient) {
@@ -1866,6 +2154,7 @@ export async function getAdminHistoryEntries(client: SupabaseBrowserClient) {
     { data: historyData, error: historyError },
     { data: consultationData, error: consultationError },
     { data: vaccineData, error: vaccineError },
+    { data: examData, error: examError },
   ] = await Promise.all([
     client
       .from("historico")
@@ -1882,24 +2171,34 @@ export async function getAdminHistoryEntries(client: SupabaseBrowserClient) {
       .select("*")
       .order("data_aplicacao", { ascending: false, nullsFirst: false })
       .order("created_at", { ascending: false }),
+    client
+      .from("exames")
+      .select("*")
+      .eq("status", "confirmed")
+      .order("data_agendada", { ascending: false, nullsFirst: false })
+      .order("created_at", { ascending: false }),
   ])
 
   if (historyError) throw clinicDataError(historyError)
   if (consultationError) throw clinicDataError(consultationError)
   if (vaccineError) throw clinicDataError(vaccineError)
+  if (examError) throw clinicDataError(examError)
 
   const rows = (historyData || []) as HistoricoRow[]
   const consultations = (consultationData || []) as ConsultaRow[]
   const vaccines = (vaccineData || []) as VacinaRow[]
+  const exams = (examData || []) as ExameRow[]
   const petIds = [
     ...rows.map((entry) => entry.pet_id),
     ...consultations.map((consultation) => consultation.pet_id),
     ...vaccines.map((vaccine) => vaccine.pet_id),
+    ...exams.map((exam) => exam.pet_id),
   ]
   const profileIds = [
     ...rows.map((entry) => entry.user_id),
     ...consultations.flatMap((consultation) => [consultation.user_id, consultation.veterinario_id || ""]),
     ...vaccines.flatMap((vaccine) => [vaccine.user_id, vaccine.veterinario_id || ""]),
+    ...exams.flatMap((exam) => [exam.user_id, exam.veterinario_id]),
   ]
   const linkedConsultationIds = rows.map((entry) => entry.consulta_id).filter(Boolean) as string[]
   const missingLinkedConsultationIds = linkedConsultationIds.filter(
@@ -1956,8 +2255,16 @@ export async function getAdminHistoryEntries(client: SupabaseBrowserClient) {
       const fuzzyKey = `${entry.petId}|${entry.data}|${entry.descricao.replace(/^Vacina:\s*/i, "").toLowerCase()}`
       return !normalizedHistoryVaccineKeys.has(exactKey) && !normalizedHistoryVaccineKeys.has(fuzzyKey)
     })
+  const normalizedHistoryExamKeys = new Set(
+    historyEntries
+      .filter((entry) => entry.tipo === "exame")
+      .map((entry) => `${entry.petId}|${entry.data}|${entry.descricao.toLowerCase()}`),
+  )
+  const examEntries = exams
+    .map((exam) => mapExamHistoryEntry(exam, petsById, profilesById))
+    .filter((entry) => !normalizedHistoryExamKeys.has(`${entry.petId}|${entry.data}|${entry.descricao.toLowerCase()}`))
 
-  return [...historyEntries, ...consultationEntries, ...vaccineEntries].sort((a, b) => {
+  return [...historyEntries, ...consultationEntries, ...vaccineEntries, ...examEntries].sort((a, b) => {
     const dateComparison = new Date(b.data).getTime() - new Date(a.data).getTime()
     if (dateComparison !== 0) return dateComparison
     return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
