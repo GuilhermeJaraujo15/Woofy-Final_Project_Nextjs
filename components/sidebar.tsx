@@ -50,7 +50,7 @@ export function Sidebar() {
       <header className="fixed top-0 left-0 right-0 h-16 bg-sidebar flex items-center justify-between px-4 lg:hidden z-50">
         <Link href="/" className="flex items-center gap-2">
           <img
-            src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/image-TpsROakWX1o0eROpPMT9UG5ePGZxAF.png"
+            src="/logo-pet-shop.png"
             alt="Woofy"
             className="h-10"
           />
@@ -116,7 +116,7 @@ export function Sidebar() {
         <div className="shrink-0 p-6">
           <Link href="/" className="flex items-center gap-2">
             <img
-              src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/image-TpsROakWX1o0eROpPMT9UG5ePGZxAF.png"
+              src="\logo-pet-shop.png"
               alt="Woofy"
               className="h-12"
             />

@@ -98,18 +98,6 @@ export function Header() {
             </Button>
           )}
 
-          <Button
-            variant="ghost"
-            asChild
-            className={cn(
-              "font-semibold transition-all duration-300 rounded-full",
-              isScrolled
-                ? "text-[#305165] dark:text-gray-200 hover:bg-[#AAC9BA]/10 dark:hover:bg-slate-800"
-                : "text-white hover:bg-white/15 backdrop-blur-sm"
-            )}
-          >
-            <Link href="/dashboard">Entrar</Link>
-          </Button>
 
           <Button
             asChild
@@ -122,7 +110,7 @@ export function Header() {
             )}
           >
             <Link href="/login?redirect=/tutor" aria-label="Efetue login para marcar uma consulta">
-              Entrar para agendar
+              Entrar
             </Link>
           </Button>
         </div>

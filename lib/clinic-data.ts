@@ -276,6 +276,8 @@ export interface AdminHistoryEntry {
   agendamentoId: string | null
   consultationReason: string | null
   consultationVeterinarianId: string | null
+  consultationStatus: ConsultaStatus | null
+  consultationTime: string | null
   veterinarianProfileName: string | null
   veterinarianDisplayName: string
   createdAt: string
@@ -567,8 +569,77 @@ function mapHistoryEntry(
     agendamentoId: row.agendamento_id || null,
     consultationReason: consultation?.motivo || null,
     consultationVeterinarianId: veterinarianId,
+    consultationStatus: consultation?.status || null,
+    consultationTime: consultation?.horario || null,
     veterinarianProfileName,
     veterinarianDisplayName: veterinarianProfileName || row.veterinario,
+    createdAt: row.created_at,
+  }
+}
+
+function mapConsultationHistoryEntry(
+  row: ConsultaRow,
+  petsById: Record<string, PetRow>,
+  profilesById: Record<string, ProfileRow>,
+): AdminHistoryEntry {
+  const pet = petsById[row.pet_id]
+  const tutorProfileName = profilesById[row.user_id]?.full_name || null
+  const veterinarianProfileName = row.veterinario_id ? profilesById[row.veterinario_id]?.full_name || null : null
+
+  return {
+    id: `consulta-${row.id}`,
+    petId: row.pet_id,
+    userId: row.user_id,
+    petNome: pet?.nome || "Pet sem nome",
+    tutor: pet?.tutor || tutorProfileName || row.tutor || "Tutor não identificado",
+    tutorProfileName,
+    tutorDisplayName: tutorProfileName || pet?.tutor || row.tutor || "Tutor não identificado",
+    data: row.data,
+    tipo: "consulta",
+    descricao: "Retorno médico registrado",
+    veterinario: row.veterinario,
+    consultaId: row.id,
+    agendamentoId: row.agendamento_id || null,
+    consultationReason: row.motivo || null,
+    consultationVeterinarianId: row.veterinario_id || null,
+    consultationStatus: row.status,
+    consultationTime: row.horario || null,
+    veterinarianProfileName,
+    veterinarianDisplayName: veterinarianProfileName || row.veterinario,
+    createdAt: row.created_at,
+  }
+}
+
+function mapVaccineHistoryEntry(
+  row: VacinaRow,
+  petsById: Record<string, PetRow>,
+  profilesById: Record<string, ProfileRow>,
+): AdminHistoryEntry {
+  const pet = petsById[row.pet_id]
+  const tutorProfileName = profilesById[row.user_id]?.full_name || null
+  const veterinarianProfileName = row.veterinario_id ? profilesById[row.veterinario_id]?.full_name || null : null
+  const date = row.data_aplicacao || row.data_agendada || row.data_recomendada || row.proxima_dose || row.created_at.split("T")[0]
+
+  return {
+    id: `vacina-${row.id}`,
+    petId: row.pet_id,
+    userId: row.user_id,
+    petNome: pet?.nome || "Pet sem nome",
+    tutor: pet?.tutor || tutorProfileName || "Tutor não identificado",
+    tutorProfileName,
+    tutorDisplayName: tutorProfileName || pet?.tutor || "Tutor não identificado",
+    data: date,
+    tipo: "vacina",
+    descricao: `Vacina: ${row.vacina}`,
+    veterinario: veterinarianProfileName || "A definir",
+    consultaId: null,
+    agendamentoId: null,
+    consultationReason: null,
+    consultationVeterinarianId: null,
+    consultationStatus: null,
+    consultationTime: row.horario_agendado || null,
+    veterinarianProfileName,
+    veterinarianDisplayName: veterinarianProfileName || "A definir",
     createdAt: row.created_at,
   }
 }
@@ -1791,47 +1862,106 @@ export async function getAdminConsultationWeekdayStats(client: SupabaseBrowserCl
 }
 
 export async function getAdminHistoryEntries(client: SupabaseBrowserClient) {
-  const { data, error } = await client
-    .from("historico")
-    .select("*")
-    .order("data", { ascending: false })
-    .order("created_at", { ascending: false })
-
-  if (error) throw clinicDataError(error)
-
-  const rows = (data || []) as HistoricoRow[]
-  const petIds = rows.map((entry) => entry.pet_id)
-  const userIds = rows.map((entry) => entry.user_id)
-  const consultationIds = [...new Set(rows.map((entry) => entry.consulta_id).filter(Boolean))] as string[]
-
-  const [{ data: petData, error: petError }, { data: consultationData, error: consultationError }] = await Promise.all([
-    petIds.length > 0
-      ? client.from("pets").select("*").in("id", [...new Set(petIds)])
-      : Promise.resolve({ data: [], error: null }),
-    consultationIds.length > 0
-      ? client.from("consultas").select("*").in("id", consultationIds)
-      : Promise.resolve({ data: [], error: null }),
+  const [
+    { data: historyData, error: historyError },
+    { data: consultationData, error: consultationError },
+    { data: vaccineData, error: vaccineError },
+  ] = await Promise.all([
+    client
+      .from("historico")
+      .select("*")
+      .order("data", { ascending: false })
+      .order("created_at", { ascending: false }),
+    client
+      .from("consultas")
+      .select("*")
+      .order("data", { ascending: false })
+      .order("created_at", { ascending: false }),
+    client
+      .from("vacinas")
+      .select("*")
+      .order("data_aplicacao", { ascending: false, nullsFirst: false })
+      .order("created_at", { ascending: false }),
   ])
 
-  if (petError) throw clinicDataError(petError)
+  if (historyError) throw clinicDataError(historyError)
   if (consultationError) throw clinicDataError(consultationError)
+  if (vaccineError) throw clinicDataError(vaccineError)
 
+  const rows = (historyData || []) as HistoricoRow[]
   const consultations = (consultationData || []) as ConsultaRow[]
-  const profileIds = [
-    ...userIds,
-    ...consultations.map((consultation) => consultation.veterinario_id || ""),
+  const vaccines = (vaccineData || []) as VacinaRow[]
+  const petIds = [
+    ...rows.map((entry) => entry.pet_id),
+    ...consultations.map((consultation) => consultation.pet_id),
+    ...vaccines.map((vaccine) => vaccine.pet_id),
   ]
-  const profilesById = await getProfilesByIds(client, profileIds)
+  const profileIds = [
+    ...rows.map((entry) => entry.user_id),
+    ...consultations.flatMap((consultation) => [consultation.user_id, consultation.veterinario_id || ""]),
+    ...vaccines.flatMap((vaccine) => [vaccine.user_id, vaccine.veterinario_id || ""]),
+  ]
+  const linkedConsultationIds = rows.map((entry) => entry.consulta_id).filter(Boolean) as string[]
+  const missingLinkedConsultationIds = linkedConsultationIds.filter(
+    (id) => !consultations.some((consultation) => consultation.id === id),
+  )
+
+  const [{ data: petData, error: petError }, { data: linkedConsultationData, error: linkedConsultationError }, profilesById] =
+    await Promise.all([
+      petIds.length > 0
+        ? client.from("pets").select("*").in("id", [...new Set(petIds)])
+        : Promise.resolve({ data: [], error: null }),
+      missingLinkedConsultationIds.length > 0
+        ? client.from("consultas").select("*").in("id", [...new Set(missingLinkedConsultationIds)])
+        : Promise.resolve({ data: [], error: null }),
+      getProfilesByIds(client, profileIds),
+    ])
+
+  if (petError) throw clinicDataError(petError)
+  if (linkedConsultationError) throw clinicDataError(linkedConsultationError)
+
+  const allConsultations = [...consultations, ...((linkedConsultationData || []) as ConsultaRow[])].filter(
+    (consultation, index, items) => items.findIndex((item) => item.id === consultation.id) === index,
+  )
   const petsById = ((petData || []) as PetRow[]).reduce<Record<string, PetRow>>((acc, pet) => {
     acc[pet.id] = pet
     return acc
   }, {})
-  const consultationsById = consultations.reduce<Record<string, ConsultaRow>>((acc, consultation) => {
+  const consultationsById = allConsultations.reduce<Record<string, ConsultaRow>>((acc, consultation) => {
     acc[consultation.id] = consultation
     return acc
   }, {})
 
-  return rows.map((entry) => mapHistoryEntry(entry, petsById, profilesById, consultationsById))
+  const historyEntries = rows.map((entry) => mapHistoryEntry(entry, petsById, profilesById, consultationsById))
+  const historyConsultationIds = new Set(historyEntries.map((entry) => entry.consultaId).filter(Boolean))
+  const historyAppointmentIds = new Set(historyEntries.map((entry) => entry.agendamentoId).filter(Boolean))
+
+  const consultationEntries = consultations
+    .filter((consultation) => {
+      if (historyConsultationIds.has(consultation.id)) return false
+      if (consultation.agendamento_id && historyAppointmentIds.has(consultation.agendamento_id)) return false
+      return true
+    })
+    .map((consultation) => mapConsultationHistoryEntry(consultation, petsById, profilesById))
+
+  const normalizedHistoryVaccineKeys = new Set(
+    historyEntries
+      .filter((entry) => entry.tipo === "vacina")
+      .map((entry) => `${entry.petId}|${entry.data}|${entry.descricao.toLowerCase()}`),
+  )
+  const vaccineEntries = vaccines
+    .map((vaccine) => mapVaccineHistoryEntry(vaccine, petsById, profilesById))
+    .filter((entry) => {
+      const exactKey = `${entry.petId}|${entry.data}|${entry.descricao.toLowerCase()}`
+      const fuzzyKey = `${entry.petId}|${entry.data}|${entry.descricao.replace(/^Vacina:\s*/i, "").toLowerCase()}`
+      return !normalizedHistoryVaccineKeys.has(exactKey) && !normalizedHistoryVaccineKeys.has(fuzzyKey)
+    })
+
+  return [...historyEntries, ...consultationEntries, ...vaccineEntries].sort((a, b) => {
+    const dateComparison = new Date(b.data).getTime() - new Date(a.data).getTime()
+    if (dateComparison !== 0) return dateComparison
+    return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+  })
 }
 
 export async function getAdminFinancialEntries(client: SupabaseBrowserClient) {

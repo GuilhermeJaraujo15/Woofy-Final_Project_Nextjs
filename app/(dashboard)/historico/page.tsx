@@ -26,6 +26,12 @@ const tipoLabels: Record<HistoricoTipo, string> = {
   exame: "Exame",
 }
 
+const consultationStatusLabels: Record<string, string> = {
+  agendada: "Agendada",
+  realizada: "Realizada",
+  cancelada: "Cancelada",
+}
+
 export default function HistoricoPage() {
   const { user, loading, refreshProfile } = useAuth()
   const router = useRouter()
@@ -150,8 +156,20 @@ export default function HistoricoPage() {
                             {tipoLabels[item.tipo]}
                           </span>
                           <p className="text-card-foreground font-medium">{item.descricao}</p>
-                          {item.consultationReason && (
-                            <p className="text-sm text-muted-foreground mt-1">Consulta: {item.consultationReason}</p>
+                          {item.tipo === "consulta" && (
+                            <div className="mt-2 space-y-1 text-sm text-muted-foreground">
+                              <p>
+                                Status:{" "}
+                                {item.consultationStatus
+                                  ? consultationStatusLabels[item.consultationStatus] || item.consultationStatus
+                                  : "Não informado"}
+                              </p>
+                              {item.consultationTime && <p>Horário: {item.consultationTime}</p>}
+                              <p>
+                                Retorno médico:{" "}
+                                {item.consultationReason ? item.consultationReason : "Pendente de registro"}
+                              </p>
+                            </div>
                           )}
                           <p className="text-sm text-muted-foreground mt-1">
                             Veterinário: {item.veterinarianDisplayName}

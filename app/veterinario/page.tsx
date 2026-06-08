@@ -348,13 +348,13 @@ export default function VeterinarioPage() {
                 ]}
               />
               <FilterSelect
-                label="Estado clínico"
+                label="Estado do atendimento"
                 value={clinicalStateFilter}
                 onChange={(value) => setClinicalStateFilter(value as ClinicalStateFilter)}
                 options={[
                   ["todos", "Todos"],
-                  ["retorno-pendente", "Retorno pendente"],
-                  ["retorno-registrado", "Retorno registrado"],
+                  ["retorno-pendente", "Retorno médico pendente"],
+                  ["retorno-registrado", "Retorno médico registrado"],
                   ["consulta-realizada", "Consulta realizada"],
                 ]}
               />
@@ -402,7 +402,7 @@ export default function VeterinarioPage() {
                           <div className="mt-2 flex flex-wrap gap-1 sm:justify-end">
                             {appointment.status === "realizado" && <RecordBadge>Consulta realizada</RecordBadge>}
                             <RecordBadge muted={!appointment.consultation}>
-                              {appointment.consultation ? "Retorno registrado" : "Retorno pendente"}
+                              {appointment.consultation ? "Retorno médico registrado" : "Retorno médico pendente"}
                             </RecordBadge>
                           </div>
                           <Button type="button" variant="outline" size="sm" className="mt-3" onClick={() => handleArchiveAppointment(appointment.id)}>

@@ -13,15 +13,7 @@ export function ServicesSection() {
       iconColor: "text-[#305165] dark:text-[#AAC9BA]",
       hoverGradient: "group-hover:from-[#305165] group-hover:to-[#5E929F]",
     },
-    {
-      title: "Cirurgia e Internação",
-      description:
-        "Centro cirúrgico equipado com anestesia inalatória e monitoramento multiparamétrico completo para a máxima segurança.",
-      icon: Heart,
-      gradient: "from-[#5E929F]/25 to-[#5E929F]/5",
-      iconColor: "text-[#5E929F]",
-      hoverGradient: "group-hover:from-[#5E929F] group-hover:to-[#305165]",
-    },
+
     {
       title: "Vacinação e Prevenção",
       description:
@@ -32,15 +24,6 @@ export function ServicesSection() {
       hoverGradient: "group-hover:from-[#B1AE77] group-hover:to-[#AAC9BA]",
     },
     {
-      title: "Banho e Estética Premium",
-      description:
-        "Banhos relaxantes, tosa de raça, tosa higiênica e corte de unhas utilizando produtos hipoalergênicos de alto padrão.",
-      icon: Scissors,
-      gradient: "from-[#AAC9BA]/25 to-[#AAC9BA]/5",
-      iconColor: "text-[#305165] dark:text-[#AAC9BA]",
-      hoverGradient: "group-hover:from-[#305165] group-hover:to-[#5E929F]",
-    },
-    {
       title: "Exames de Imagem e Laboratório",
       description:
         "Exames de sangue rápidos, ultrassom e raio-x realizados diretamente na clínica para diagnóstico ágil.",
@@ -49,15 +32,7 @@ export function ServicesSection() {
       iconColor: "text-[#5E929F]",
       hoverGradient: "group-hover:from-[#5E929F] group-hover:to-[#305165]",
     },
-    {
-      title: "Odontologia Veterinária",
-      description:
-        "Tratamento de tártaro, extrações necessárias e orientações de escovação para manter o hálito e dentes do pet saudáveis.",
-      icon: ShieldAlert,
-      gradient: "from-[#E1EABB]/40 to-[#E1EABB]/10",
-      iconColor: "text-[#B1AE77] dark:text-[#E1EABB]",
-      hoverGradient: "group-hover:from-[#B1AE77] group-hover:to-[#AAC9BA]",
-    },
+
   ]
 
   return (
