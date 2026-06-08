@@ -21,6 +21,8 @@ import { useApp } from "@/context/app-context"
 import { createClient } from "@/lib/supabase"
 import {
   archiveTutorAppointment,
+  cancelTutorVaccine,
+  confirmTutorVaccine,
   createTutorAppointment,
   getApprovedVeterinarians,
   getTutorAppointments,
@@ -29,7 +31,6 @@ import {
   getTutorPetHistory,
   getTutorVaccines,
   restoreTutorAppointment,
-  scheduleTutorVaccine,
   type AdminHistoryEntry,
   type AdminVaccine,
   type ClinicAppointment,
@@ -92,6 +93,7 @@ function vaccineStatusLabel(status: AdminVaccine["status"]) {
   const labels: Record<AdminVaccine["status"], string> = {
     recommended: "Recomendada",
     scheduled: "Agendada",
+    confirmed: "Confirmada",
     applied: "Aplicada",
     cancelled: "Cancelada",
   }
@@ -116,7 +118,7 @@ export default function TutorPage() {
   const [feedbacks, setFeedbacks] = useState<TutorConsultationFeedback[]>([])
   const [historico, setHistorico] = useState<AdminHistoryEntry[]>([])
   const [financialSummary, setFinancialSummary] = useState({ consultationTotal: 0, vaccineTotal: 0, total: 0 })
-  const [vaccineScheduleForms, setVaccineScheduleForms] = useState<Record<string, { data: string; horario: string }>>({})
+  const [vaccineCancelForms, setVaccineCancelForms] = useState<Record<string, { isOpen: boolean; reason: string }>>({})
   const [petForm, setPetForm] = useState(initialPetForm)
   const [appointmentForm, setAppointmentForm] = useState(initialAppointmentForm)
   const [isLoadingData, setIsLoadingData] = useState(true)
@@ -351,27 +353,46 @@ export default function TutorPage() {
     }
   }
 
-  async function handleScheduleVaccine(vaccineId: string) {
+  async function handleConfirmVaccine(vaccineId: string) {
     if (!user) return
 
-    const form = vaccineScheduleForms[vaccineId]
-    if (!form?.data || !form?.horario) {
-      addToast("Informe data e horário para a vacina.", "error")
+    try {
+      const updatedVaccine = await confirmTutorVaccine(supabase, {
+        vaccineId,
+        userId: user.id,
+      })
+      setVacinas((current) => current.map((vacina) => (vacina.id === vaccineId ? updatedVaccine : vacina)))
+      setFinancialSummary(await getTutorFinancialSummary(supabase, user.id))
+      addToast("Vacina confirmada com sucesso.")
+    } catch {
+      addToast("Nao foi possivel confirmar a vacina.", "error")
+    }
+  }
+
+  async function handleCancelVaccine(vaccineId: string) {
+    if (!user) return
+
+    const reason = vaccineCancelForms[vaccineId]?.reason.trim() || ""
+    if (!reason) {
+      addToast("Informe o motivo do cancelamento.", "error")
       return
     }
 
     try {
-      const updatedVaccine = await scheduleTutorVaccine(supabase, {
+      const updatedVaccine = await cancelTutorVaccine(supabase, {
         vaccineId,
         userId: user.id,
-        dataAgendada: form.data,
-        horarioAgendado: form.horario,
+        reason,
       })
       setVacinas((current) => current.map((vacina) => (vacina.id === vaccineId ? updatedVaccine : vacina)))
+      setVaccineCancelForms((current) => ({
+        ...current,
+        [vaccineId]: { isOpen: false, reason: "" },
+      }))
       setFinancialSummary(await getTutorFinancialSummary(supabase, user.id))
-      addToast("Vacina agendada com sucesso.")
+      addToast("Vacina cancelada com sucesso.")
     } catch {
-      addToast("Não foi possível agendar a vacina.", "error")
+      addToast("Nao foi possivel cancelar a vacina.", "error")
     }
   }
 
@@ -617,31 +638,60 @@ export default function TutorPage() {
                     <p className="text-sm text-muted-foreground">Recomendada em: {vacina.dataRecomendada || "não definida"}</p>
                     <p className="text-sm text-muted-foreground">Agendada para: {vacina.dataAgendada ? `${vacina.dataAgendada} ${vacina.horarioAgendado || ""}` : "não agendada"}</p>
                     <p className="text-sm text-muted-foreground">Aplicação: {vacina.dataAplicacao || "não aplicada"}</p>
-                    {vacina.status === "recommended" && (
-                      <div className="mt-3 grid gap-3 sm:grid-cols-[1fr_1fr_auto]">
-                        <Input
-                          type="date"
-                          value={vaccineScheduleForms[vacina.id]?.data || ""}
-                          onChange={(event) =>
-                            setVaccineScheduleForms((current) => ({
-                              ...current,
-                              [vacina.id]: { ...current[vacina.id], data: event.target.value, horario: current[vacina.id]?.horario || "" },
-                            }))
-                          }
-                        />
-                        <Input
-                          type="time"
-                          value={vaccineScheduleForms[vacina.id]?.horario || ""}
-                          onChange={(event) =>
-                            setVaccineScheduleForms((current) => ({
-                              ...current,
-                              [vacina.id]: { ...current[vacina.id], data: current[vacina.id]?.data || "", horario: event.target.value },
-                            }))
-                          }
-                        />
-                        <Button type="button" onClick={() => handleScheduleVaccine(vacina.id)}>
-                          Agendar vacina
-                        </Button>
+                    {(vacina.status === "recommended" || vacina.status === "scheduled") && (
+                      <div className="mt-3 space-y-3">
+                        <div className="flex flex-wrap gap-2">
+                          <Button type="button" onClick={() => handleConfirmVaccine(vacina.id)}>
+                            Confirmar vacina
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() =>
+                              setVaccineCancelForms((current) => ({
+                                ...current,
+                                [vacina.id]: {
+                                  isOpen: !current[vacina.id]?.isOpen,
+                                  reason: current[vacina.id]?.reason || "",
+                                },
+                              }))
+                            }
+                          >
+                            Cancelar vacina
+                          </Button>
+                        </div>
+                        {vaccineCancelForms[vacina.id]?.isOpen && (
+                          <div className="space-y-2">
+                            <Label htmlFor={`cancel-${vacina.id}`}>Motivo do cancelamento</Label>
+                            <Textarea
+                              id={`cancel-${vacina.id}`}
+                              required
+                              value={vaccineCancelForms[vacina.id]?.reason || ""}
+                              onChange={(event) =>
+                                setVaccineCancelForms((current) => ({
+                                  ...current,
+                                  [vacina.id]: {
+                                    isOpen: true,
+                                    reason: event.target.value,
+                                  },
+                                }))
+                              }
+                              className="min-h-20"
+                            />
+                            <Button type="button" variant="destructive" onClick={() => handleCancelVaccine(vacina.id)}>
+                              Enviar cancelamento
+                            </Button>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                    {vacina.tutorResposta === "confirmada" && (
+                      <p className="mt-2 text-sm font-medium text-green-700">Confirmada pelo tutor</p>
+                    )}
+                    {vacina.tutorResposta === "cancelada" && (
+                      <div className="mt-2 text-sm text-muted-foreground">
+                        <p className="font-medium text-destructive">Cancelada pelo tutor</p>
+                        <p>Motivo do cancelamento: {vacina.tutorMotivoCancelamento || "Nao informado"}</p>
                       </div>
                     )}
                   </div>

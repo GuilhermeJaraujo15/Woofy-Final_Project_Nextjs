@@ -8,7 +8,7 @@ export type AgendamentoStatus = "agendado" | "confirmado" | "realizado" | "cance
 export type AppointmentStatus = AgendamentoStatus
 export type ConsultaStatus = "agendada" | "realizada" | "cancelada"
 export type HistoricoTipo = "consulta" | "vacina" | "exame"
-export type VaccineStatus = "recommended" | "scheduled" | "applied" | "cancelled"
+export type VaccineStatus = "recommended" | "scheduled" | "confirmed" | "applied" | "cancelled"
 export type FinancialEntryStatus = "active" | "cancelled"
 
 export interface ProfileSummary {
@@ -92,6 +92,9 @@ interface VacinaRow {
   data_recomendada?: string | null
   data_agendada?: string | null
   horario_agendado?: string | null
+  tutor_resposta?: string | null
+  tutor_respondeu_em?: string | null
+  tutor_motivo_cancelamento?: string | null
   created_at: string
 }
 
@@ -313,6 +316,9 @@ export interface AdminVaccine {
   dataRecomendada: string | null
   dataAgendada: string | null
   horarioAgendado: string | null
+  tutorResposta: string | null
+  tutorRespondeuEm: string | null
+  tutorMotivoCancelamento: string | null
   veterinarioId: string | null
   veterinarianDisplayName: string
   valor: number | null
@@ -369,16 +375,17 @@ export interface CreateVaccineRecordInput {
   vacina: string
   dataAplicacao?: string | null
   proximaDose: string | null
+  dataAgendada?: string | null
+  horarioAgendado?: string | null
   veterinarioId: string
   valor?: number | null
   status?: VaccineStatus
 }
 
-export interface ScheduleTutorVaccineInput {
+export interface TutorVaccineResponseInput {
   vaccineId: string
   userId: string
-  dataAgendada: string
-  horarioAgendado: string
+  reason?: string
 }
 
 const defaultConsultationPrice = 180
@@ -589,6 +596,9 @@ function mapVaccine(
     dataRecomendada: row.data_recomendada || null,
     dataAgendada: row.data_agendada || null,
     horarioAgendado: row.horario_agendado || null,
+    tutorResposta: row.tutor_resposta || null,
+    tutorRespondeuEm: row.tutor_respondeu_em || null,
+    tutorMotivoCancelamento: row.tutor_motivo_cancelamento || null,
     veterinarioId: row.veterinario_id || null,
     veterinarianDisplayName: veterinarianProfileName || "A definir",
     valor: row.valor == null ? null : Number(row.valor),
@@ -1462,6 +1472,10 @@ export async function createOrUpdateFinanceEntryFromVaccine(
   client: SupabaseBrowserClient,
   vaccine: AdminVaccine,
 ) {
+  if (vaccine.status !== "confirmed" && vaccine.status !== "applied") {
+    return
+  }
+
   await createOrUpdateFinanceEntryFromSource(client, {
     userId: vaccine.userId,
     descricao: `Vacina - ${vaccine.petNome} - ${vaccine.vacina}`,
@@ -1471,6 +1485,17 @@ export async function createOrUpdateFinanceEntryFromVaccine(
     origemTipo: "vaccine",
     origemId: vaccine.id,
   })
+}
+
+export async function cancelFinanceEntryFromVaccine(client: SupabaseBrowserClient, vaccineId: string, userId: string) {
+  const { error } = await client
+    .from("lancamentos")
+    .update({ status: "cancelled" as FinancialEntryStatus })
+    .eq("origem_tipo", "vaccine")
+    .eq("origem_id", vaccineId)
+    .eq("user_id", userId)
+
+  if (error) throw clinicDataError(error)
 }
 
 export async function getVeterinarianVaccines(client: SupabaseBrowserClient, veterinarianId?: string) {
@@ -1508,9 +1533,11 @@ export async function createVaccineRecord(client: SupabaseBrowserClient, input: 
       vacina: input.vacina,
       data_aplicacao: input.status === "applied" ? input.dataAplicacao || new Date().toISOString().split("T")[0] : null,
       proxima_dose: input.proximaDose,
+      data_agendada: input.dataAgendada || null,
+      horario_agendado: input.horarioAgendado || null,
       veterinario_id: input.veterinarioId,
       valor: input.valor ?? defaultVaccinePrice,
-      status: input.status || "recommended",
+      status: input.status || (input.dataAgendada && input.horarioAgendado ? "scheduled" : "recommended"),
       data_recomendada: new Date().toISOString().split("T")[0],
     })
     .select("*")
@@ -1523,13 +1550,14 @@ export async function createVaccineRecord(client: SupabaseBrowserClient, input: 
   return mapVaccine(row, { [input.petId]: petData as PetRow }, profilesById)
 }
 
-export async function scheduleTutorVaccine(client: SupabaseBrowserClient, input: ScheduleTutorVaccineInput) {
+export async function confirmTutorVaccine(client: SupabaseBrowserClient, input: TutorVaccineResponseInput) {
   const { data, error } = await client
     .from("vacinas")
     .update({
-      status: "scheduled",
-      data_agendada: input.dataAgendada,
-      horario_agendado: input.horarioAgendado,
+      status: "confirmed",
+      tutor_resposta: "confirmada",
+      tutor_respondeu_em: new Date().toISOString(),
+      tutor_motivo_cancelamento: null,
     })
     .eq("id", input.vaccineId)
     .eq("user_id", input.userId)
@@ -1541,6 +1569,33 @@ export async function scheduleTutorVaccine(client: SupabaseBrowserClient, input:
   const row = data as VacinaRow
   const [vaccine] = await mapVaccineRows(client, [row])
   await createOrUpdateFinanceEntryFromVaccine(client, vaccine)
+  return vaccine
+}
+
+export async function cancelTutorVaccine(client: SupabaseBrowserClient, input: TutorVaccineResponseInput) {
+  const reason = input.reason?.trim()
+  if (!reason) {
+    throw new Error("Cancellation reason is required.")
+  }
+
+  const { data, error } = await client
+    .from("vacinas")
+    .update({
+      status: "cancelled",
+      tutor_resposta: "cancelada",
+      tutor_respondeu_em: new Date().toISOString(),
+      tutor_motivo_cancelamento: reason,
+    })
+    .eq("id", input.vaccineId)
+    .eq("user_id", input.userId)
+    .select("*")
+    .single()
+
+  if (error) throw clinicDataError(error)
+
+  const row = data as VacinaRow
+  const [vaccine] = await mapVaccineRows(client, [row])
+  await cancelFinanceEntryFromVaccine(client, input.vaccineId, input.userId)
   return vaccine
 }
 

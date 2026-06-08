@@ -38,6 +38,7 @@ function vaccineStatusLabel(status: AdminVaccine["status"]) {
   const labels: Record<AdminVaccine["status"], string> = {
     recommended: "Recomendada",
     scheduled: "Agendada",
+    confirmed: "Confirmada",
     applied: "Aplicada",
     cancelled: "Cancelada",
   }
@@ -117,6 +118,7 @@ export default function VacinacaoPage() {
                   <th className="text-left px-4 py-3 text-sm font-semibold text-card-foreground">Próxima Dose</th>
                   <th className="text-left px-4 py-3 text-sm font-semibold text-card-foreground">Veterinário</th>
                   <th className="text-left px-4 py-3 text-sm font-semibold text-card-foreground">Valor</th>
+                  <th className="text-left px-4 py-3 text-sm font-semibold text-card-foreground">Resposta do tutor</th>
                   <th className="text-left px-4 py-3 text-sm font-semibold text-card-foreground">Status</th>
                 </tr>
               </thead>
@@ -137,6 +139,16 @@ export default function VacinacaoPage() {
                       <td className="px-4 py-3 text-muted-foreground">{formatDate(vacina.proximaDose)}</td>
                       <td className="px-4 py-3 text-muted-foreground">{vacina.veterinarianDisplayName}</td>
                       <td className="px-4 py-3 text-muted-foreground">{formatCurrency(vacina.valor)}</td>
+                      <td className="px-4 py-3 text-muted-foreground">
+                        {vacina.tutorResposta === "confirmada" && "Confirmada pelo tutor"}
+                        {vacina.tutorResposta === "cancelada" && (
+                          <span>
+                            Cancelada pelo tutor
+                            {vacina.tutorMotivoCancelamento ? ` - Motivo do cancelamento: ${vacina.tutorMotivoCancelamento}` : ""}
+                          </span>
+                        )}
+                        {!vacina.tutorResposta && "Aguardando resposta do tutor"}
+                      </td>
                       <td className="px-4 py-3">
                         <span className={cn("inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium", statusInfo.color)}>
                           {statusInfo.status === "vencida" && <AlertTriangle className="h-3 w-3" />}

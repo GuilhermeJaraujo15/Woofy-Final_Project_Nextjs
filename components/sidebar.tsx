@@ -75,7 +75,7 @@ export function Sidebar() {
       {/* Mobile Navigation */}
       <nav
         className={cn(
-          "fixed top-16 left-0 bottom-0 w-64 bg-sidebar transform transition-transform duration-300 z-40 lg:hidden",
+          "fixed top-16 left-0 bottom-0 w-64 overflow-y-auto bg-sidebar transform transition-transform duration-300 z-40 lg:hidden",
           mobileOpen ? "translate-x-0" : "-translate-x-full"
         )}
       >
@@ -112,8 +112,8 @@ export function Sidebar() {
       </nav>
 
       {/* Desktop Sidebar */}
-      <aside className="hidden lg:flex fixed top-0 left-0 bottom-0 w-64 bg-sidebar flex-col z-50">
-        <div className="p-6">
+      <aside className="hidden lg:flex fixed top-0 left-0 h-dvh w-64 bg-sidebar flex-col overflow-hidden z-50">
+        <div className="shrink-0 p-6">
           <Link href="/" className="flex items-center gap-2">
             <img
               src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/image-TpsROakWX1o0eROpPMT9UG5ePGZxAF.png"
@@ -123,7 +123,7 @@ export function Sidebar() {
           </Link>
         </div>
 
-        <nav className="flex-1 px-4">
+        <nav className="min-h-0 flex-1 overflow-y-auto px-4 pb-4">
           <div className="flex flex-col gap-1">
             {navItems.map((item) => {
               const Icon = item.icon
@@ -147,7 +147,7 @@ export function Sidebar() {
           </div>
         </nav>
 
-        <div className="p-4 border-t border-sidebar-border">
+        <div className="shrink-0 border-t border-sidebar-border p-4">
           <div className="flex items-center gap-3 px-4 py-2">
             <div className="h-10 w-10 rounded-full bg-sidebar-accent flex items-center justify-center">
               <span className="text-sidebar-accent-foreground font-semibold">W</span>

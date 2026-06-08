@@ -42,6 +42,8 @@ export default function VeterinarioPage() {
     petId: "",
     vacina: "",
     proximaDose: "",
+    dataAgendada: "",
+    horarioAgendado: "",
     valor: "95",
   })
   const [statusFilter, setStatusFilter] = useState<"todos" | AgendamentoStatus>("todos")
@@ -246,6 +248,10 @@ export default function VeterinarioPage() {
       return
     }
     const vaccineValue = Number(vaccineForm.valor)
+    if (!vaccineForm.dataAgendada || !vaccineForm.horarioAgendado) {
+      setErrorMessage("Informe data e horario propostos para a vacina.")
+      return
+    }
     if (!vaccineForm.vacina.trim() || !Number.isFinite(vaccineValue) || vaccineValue <= 0) {
       setErrorMessage("Informe a vacina e um valor válido.")
       return
@@ -262,14 +268,18 @@ export default function VeterinarioPage() {
         vacina: vaccineForm.vacina.trim(),
         dataAplicacao: null,
         proximaDose: vaccineForm.proximaDose || null,
+        dataAgendada: vaccineForm.dataAgendada,
+        horarioAgendado: vaccineForm.horarioAgendado,
         veterinarioId: user.id,
         valor: vaccineValue,
-        status: "recommended",
+        status: "scheduled",
       })
       setVaccineForm({
         petId: selectedPet.id,
         vacina: "",
         proximaDose: "",
+        dataAgendada: "",
+        horarioAgendado: "",
         valor: "95",
       })
       setVaccineRecords(await getVeterinarianVaccines(supabase, user.id))
@@ -508,7 +518,7 @@ export default function VeterinarioPage() {
         </Panel>
 
         <Panel title="Registrar vacina" icon={Syringe}>
-          <form onSubmit={handleCreateVaccine} className="grid gap-4 md:grid-cols-[1.2fr_1fr_1fr_1fr_auto] md:items-end">
+          <form onSubmit={handleCreateVaccine} className="grid gap-4 md:grid-cols-[1.2fr_1fr_1fr_1fr_1fr_1fr_auto] md:items-end">
             <div className="space-y-2">
               <Label htmlFor="vaccinePet">Pet</Label>
               <select
@@ -540,6 +550,20 @@ export default function VeterinarioPage() {
               required
             />
             <Field
+              label="Data proposta"
+              type="date"
+              value={vaccineForm.dataAgendada}
+              onChange={(value) => setVaccineForm({ ...vaccineForm, dataAgendada: value })}
+              required
+            />
+            <Field
+              label="Horario proposto"
+              type="time"
+              value={vaccineForm.horarioAgendado}
+              onChange={(value) => setVaccineForm({ ...vaccineForm, horarioAgendado: value })}
+              required
+            />
+            <Field
               label="Próxima dose"
               type="date"
               value={vaccineForm.proximaDose}
@@ -559,7 +583,16 @@ export default function VeterinarioPage() {
                 <div key={vacina.id} className="rounded-lg border border-border bg-background p-4">
                   <p className="font-semibold text-foreground">{vacina.petNome} - {vacina.vacina}</p>
                   <p className="text-sm text-muted-foreground">Tutor: {vacina.tutorDisplayName}</p>
-                  <p className="text-sm text-muted-foreground">Status: {vacina.status}</p>
+                  <p className="text-sm text-muted-foreground">Status: {vaccineStatusLabel(vacina.status)}</p>
+                  <p className="text-sm text-muted-foreground">
+                    Agendada para: {vacina.dataAgendada ? `${vacina.dataAgendada} ${vacina.horarioAgendado || ""}` : "nao definida"}
+                  </p>
+                  <p className="text-sm font-medium text-foreground">{tutorVaccineResponseLabel(vacina)}</p>
+                  {vacina.tutorResposta === "cancelada" && (
+                    <p className="text-sm text-muted-foreground">
+                      Motivo do cancelamento: {vacina.tutorMotivoCancelamento || "Nao informado"}
+                    </p>
+                  )}
                   <p className="text-sm text-muted-foreground">
                     Próxima dose: {vacina.proximaDose || "não definida"}
                   </p>
@@ -679,6 +712,23 @@ function statusLabel(status: string) {
     cancelado: "Cancelado",
   }
   return labels[status] || status
+}
+
+function vaccineStatusLabel(status: AdminVaccine["status"]) {
+  const labels: Record<AdminVaccine["status"], string> = {
+    recommended: "Recomendada",
+    scheduled: "Agendada",
+    confirmed: "Confirmada",
+    applied: "Aplicada",
+    cancelled: "Cancelada",
+  }
+  return labels[status] || status
+}
+
+function tutorVaccineResponseLabel(vacina: AdminVaccine) {
+  if (vacina.tutorResposta === "confirmada") return "Confirmada pelo tutor"
+  if (vacina.tutorResposta === "cancelada") return "Cancelada pelo tutor"
+  return "Aguardando resposta do tutor"
 }
 
 function EmptyState({ text }: { text: string }) {

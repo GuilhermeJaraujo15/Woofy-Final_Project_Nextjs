@@ -95,7 +95,7 @@ interface ConsultaRow {
 interface VacinaRow {
   id: string
   proxima_dose: string | null
-  status?: "recommended" | "scheduled" | "applied" | "cancelled"
+  status?: "recommended" | "scheduled" | "confirmed" | "applied" | "cancelled"
 }
 
 interface AdminDashboardData {
@@ -181,7 +181,7 @@ export default function DashboardPage() {
   const consultasHoje = data.consultas.filter((c) => c.data === today && c.status === "realizada").length
 
   const vacinasPendentes = data.vacinas.filter((v) => {
-    if (v.status === "recommended" || v.status === "scheduled") return true
+    if (v.status === "recommended" || v.status === "scheduled" || v.status === "confirmed") return true
     if (v.status === "cancelled") return false
     if (!v.proxima_dose) return false
     const proximaDose = new Date(v.proxima_dose)
