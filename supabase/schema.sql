@@ -132,11 +132,15 @@ CREATE TABLE IF NOT EXISTS public.pets (
   telefone_tutor TEXT,
   foto TEXT,
   arquivado BOOLEAN NOT NULL DEFAULT false,
+  is_archived BOOLEAN NOT NULL DEFAULT false,
+  archived_at TIMESTAMPTZ,
+  archived_by UUID REFERENCES public.profiles(id),
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
 CREATE INDEX idx_pets_user_id ON public.pets(user_id);
+CREATE INDEX idx_pets_is_archived ON public.pets(is_archived);
 
 ALTER TABLE public.pets ENABLE ROW LEVEL SECURITY;
 

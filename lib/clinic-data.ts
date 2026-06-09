@@ -31,6 +31,9 @@ interface PetRow {
   telefone_tutor: string | null
   foto: string | null
   arquivado: boolean
+  is_archived?: boolean | null
+  archived_at?: string | null
+  archived_by?: string | null
   created_at: string
 }
 
@@ -227,6 +230,8 @@ export interface AdminPet {
   telefoneTutor: string | null
   foto: string | null
   arquivado: boolean
+  isArchived: boolean
+  archivedAt: string | null
   createdAt: string
 }
 
@@ -527,7 +532,9 @@ function mapPet(row: PetRow, profilesById: Record<string, ProfileRow>): AdminPet
     tutorProfileName: profilesById[row.user_id]?.full_name || null,
     telefoneTutor: row.telefone_tutor,
     foto: row.foto,
-    arquivado: row.arquivado,
+    arquivado: Boolean(row.is_archived || row.arquivado),
+    isArchived: Boolean(row.is_archived || row.arquivado),
+    archivedAt: row.archived_at || null,
     createdAt: row.created_at,
   }
 }
@@ -1018,6 +1025,7 @@ export async function getAdminPets(client: SupabaseBrowserClient) {
   const { data, error } = await client
     .from("pets")
     .select("*")
+    .eq("is_archived", false)
     .order("created_at", { ascending: false })
 
   if (error) throw clinicDataError(error)
@@ -1031,7 +1039,8 @@ export async function getArchivedAdminPets(client: SupabaseBrowserClient) {
   const { data, error } = await client
     .from("pets")
     .select("*")
-    .eq("arquivado", true)
+    .eq("is_archived", true)
+    .order("archived_at", { ascending: false, nullsFirst: false })
     .order("created_at", { ascending: false })
 
   if (error) throw clinicDataError(error)
@@ -1088,10 +1097,10 @@ export async function updateAdminPet(client: SupabaseBrowserClient, petId: strin
   return mapPet(row, profilesById)
 }
 
-export async function archiveAdminPet(client: SupabaseBrowserClient, petId: string) {
+export async function archiveAdminPet(client: SupabaseBrowserClient, petId: string, adminId: string) {
   const { error } = await client
     .from("pets")
-    .update({ arquivado: true })
+    .update({ arquivado: true, is_archived: true, archived_at: new Date().toISOString(), archived_by: adminId })
     .eq("id", petId)
 
   if (error) throw clinicDataError(error)
@@ -1136,7 +1145,7 @@ export async function getPetsForVeterinarianWorkflow(
   return rows.reduce<ClinicPetOption[]>((acc, appointment) => {
     if (acc.some((pet) => pet.id === appointment.pet_id)) return acc
     const pet = petsById[appointment.pet_id]
-    if (!pet || pet.arquivado) return acc
+    if (!pet || pet.is_archived || pet.arquivado) return acc
 
     acc.push({
       id: pet.id,
@@ -1978,7 +1987,7 @@ export async function cancelFinanceEntryFromVaccine(client: SupabaseBrowserClien
 export async function restoreAdminPet(client: SupabaseBrowserClient, petId: string) {
   const { error } = await client
     .from("pets")
-    .update({ arquivado: false })
+    .update({ arquivado: false, is_archived: false, archived_at: null, archived_by: null })
     .eq("id", petId)
 
   if (error) throw clinicDataError(error)

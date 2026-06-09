@@ -2,36 +2,37 @@
 
 import { useEffect, useMemo, useState } from "react"
 import { useRouter } from "next/navigation"
-import { ArchiveRestore, CalendarDays, FileText, Loader2, PawPrint, Stethoscope, Syringe } from "lucide-react"
+import { ArchiveRestore, FileText, Loader2, PawPrint, Stethoscope, Syringe } from "lucide-react"
 import { createClient } from "@/lib/supabase"
 import { useAuth } from "@/context/auth-context"
 import {
-  getArchivedAdminAppointments,
   getArchivedAdminConsultations,
   getArchivedAdminExams,
   getArchivedAdminPets,
   getArchivedAdminVaccines,
-  restoreAdminAppointment,
   restoreAdminConsultation,
   restoreAdminExam,
   restoreAdminPet,
   restoreAdminVaccine,
-  type AdminAppointment,
   type AdminConsultation,
   type AdminExam,
   type AdminPet,
   type AdminVaccine,
 } from "@/lib/clinic-data"
 
-type Tab = "pets" | "consultas" | "agendamentos" | "vacinas" | "exames"
+type Tab = "pets" | "consultas" | "vacinas" | "exames"
 
 const tabs: { id: Tab; label: string; icon: typeof PawPrint }[] = [
   { id: "pets", label: "Pets", icon: PawPrint },
   { id: "consultas", label: "Consultas", icon: Stethoscope },
-  { id: "agendamentos", label: "Agendamentos", icon: CalendarDays },
   { id: "vacinas", label: "Vacinas", icon: Syringe },
   { id: "exames", label: "Exames", icon: FileText },
 ]
+
+function formatArchivedAt(value: string | null) {
+  if (!value) return "Data de arquivamento não registrada"
+  return `Arquivado em: ${new Date(value).toLocaleString("pt-BR")}`
+}
 
 export default function ArquivadosPage() {
   const { user, loading, refreshProfile } = useAuth()
@@ -40,7 +41,6 @@ export default function ArquivadosPage() {
   const [activeTab, setActiveTab] = useState<Tab>("pets")
   const [pets, setPets] = useState<AdminPet[]>([])
   const [consultas, setConsultas] = useState<AdminConsultation[]>([])
-  const [agendamentos, setAgendamentos] = useState<AdminAppointment[]>([])
   const [vacinas, setVacinas] = useState<AdminVaccine[]>([])
   const [exames, setExames] = useState<AdminExam[]>([])
   const [isLoadingData, setIsLoadingData] = useState(true)
@@ -54,16 +54,14 @@ export default function ArquivadosPage() {
     await refreshProfile(user.id)
 
     try {
-      const [petsResult, consultasResult, agendamentosResult, vacinasResult, examesResult] = await Promise.all([
+      const [petsResult, consultasResult, vacinasResult, examesResult] = await Promise.all([
         getArchivedAdminPets(supabase),
         getArchivedAdminConsultations(supabase),
-        getArchivedAdminAppointments(supabase),
         getArchivedAdminVaccines(supabase),
         getArchivedAdminExams(supabase),
       ])
       setPets(petsResult)
       setConsultas(consultasResult)
-      setAgendamentos(agendamentosResult)
       setVacinas(vacinasResult)
       setExames(examesResult)
     } catch {
@@ -87,7 +85,6 @@ export default function ArquivadosPage() {
     try {
       if (type === "pets") await restoreAdminPet(supabase, id)
       if (type === "consultas") await restoreAdminConsultation(supabase, id)
-      if (type === "agendamentos") await restoreAdminAppointment(supabase, id)
       if (type === "vacinas") await restoreAdminVaccine(supabase, id)
       if (type === "exames") await restoreAdminExam(supabase, id)
       await loadArchived()
@@ -135,7 +132,12 @@ export default function ArquivadosPage() {
       {activeTab === "pets" && (
         <ArchivedGrid emptyText="Nenhum pet arquivado.">
           {pets.map((pet) => (
-            <ArchivedItem key={pet.id} title={pet.nome} lines={[`Tutor: ${pet.tutorProfileName || pet.tutor}`, `Espécie: ${pet.especie}`]} onRestore={() => restore("pets", pet.id)} />
+            <ArchivedItem
+              key={pet.id}
+              title={pet.nome}
+              lines={[`Tutor: ${pet.tutorProfileName || pet.tutor}`, `Espécie: ${pet.especie}`, `Raça: ${pet.raca}`, formatArchivedAt(pet.archivedAt)]}
+              onRestore={() => restore("pets", pet.id)}
+            />
           ))}
         </ArchivedGrid>
       )}
@@ -143,15 +145,12 @@ export default function ArquivadosPage() {
       {activeTab === "consultas" && (
         <ArchivedGrid emptyText="Nenhuma consulta arquivada.">
           {consultas.map((consulta) => (
-            <ArchivedItem key={consulta.id} title={`${consulta.petNome} - ${consulta.data}`} lines={[`Tutor: ${consulta.tutorDisplayName}`, `Veterinário: ${consulta.veterinarianDisplayName}`, consulta.motivo]} onRestore={() => restore("consultas", consulta.id)} />
-          ))}
-        </ArchivedGrid>
-      )}
-
-      {activeTab === "agendamentos" && (
-        <ArchivedGrid emptyText="Nenhum agendamento arquivado.">
-          {agendamentos.map((agendamento) => (
-            <ArchivedItem key={agendamento.id} title={`${agendamento.petNome} - ${agendamento.data}`} lines={[`Tutor: ${agendamento.tutorProfileName || agendamento.tutor}`, `Veterinário: ${agendamento.veterinario}`, `Tipo: ${agendamento.tipo}`]} onRestore={() => restore("agendamentos", agendamento.id)} />
+            <ArchivedItem
+              key={consulta.id}
+              title={`${consulta.petNome} - ${consulta.data}`}
+              lines={[`Tutor: ${consulta.tutorDisplayName}`, `Veterinário: ${consulta.veterinarianDisplayName}`, `Status: ${consulta.status}`, consulta.motivo, formatArchivedAt(consulta.archivedAt)]}
+              onRestore={() => restore("consultas", consulta.id)}
+            />
           ))}
         </ArchivedGrid>
       )}
@@ -159,7 +158,12 @@ export default function ArquivadosPage() {
       {activeTab === "vacinas" && (
         <ArchivedGrid emptyText="Nenhuma vacina arquivada.">
           {vacinas.map((vacina) => (
-            <ArchivedItem key={vacina.id} title={`${vacina.petNome} - ${vacina.vacina}`} lines={[`Tutor: ${vacina.tutorDisplayName}`, `Veterinário: ${vacina.veterinarianDisplayName}`, `Status: ${vacina.status}`]} onRestore={() => restore("vacinas", vacina.id)} />
+            <ArchivedItem
+              key={vacina.id}
+              title={`${vacina.petNome} - ${vacina.vacina}`}
+              lines={[`Tutor: ${vacina.tutorDisplayName}`, `Veterinário: ${vacina.veterinarianDisplayName}`, `Status: ${vacina.status}`, formatArchivedAt(vacina.archivedAt)]}
+              onRestore={() => restore("vacinas", vacina.id)}
+            />
           ))}
         </ArchivedGrid>
       )}
@@ -167,7 +171,12 @@ export default function ArquivadosPage() {
       {activeTab === "exames" && (
         <ArchivedGrid emptyText="Nenhum exame arquivado.">
           {exames.map((exame) => (
-            <ArchivedItem key={exame.id} title={`${exame.petNome} - ${exame.examDisplayName}`} lines={[`Tutor: ${exame.tutorDisplayName}`, `Veterinário: ${exame.veterinarianDisplayName}`, `Status: ${exame.status}`]} onRestore={() => restore("exames", exame.id)} />
+            <ArchivedItem
+              key={exame.id}
+              title={`${exame.petNome} - ${exame.examDisplayName}`}
+              lines={[`Tutor: ${exame.tutorDisplayName}`, `Veterinário: ${exame.veterinarianDisplayName}`, `Categoria: ${exame.categoria}`, `Status: ${exame.status}`, formatArchivedAt(exame.archivedAt)]}
+              onRestore={() => restore("exames", exame.id)}
+            />
           ))}
         </ArchivedGrid>
       )}

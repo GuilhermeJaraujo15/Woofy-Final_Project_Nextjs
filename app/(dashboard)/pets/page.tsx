@@ -403,7 +403,7 @@ export default function PetsPage() {
   }, [addToast, loading, refreshProfile, router, supabase, user])
 
   const filteredPets = pets.filter((pet) => {
-    if (pet.arquivado) return false
+    if (pet.isArchived || pet.arquivado) return false
     const matchesSearch =
       pet.nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
       pet.tutor.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -443,10 +443,16 @@ export default function PetsPage() {
   }
 
   const handleArchive = async (id: string) => {
+    if (!user) return
+
     try {
-      await archiveAdminPet(supabase, id)
+      await archiveAdminPet(supabase, id, user.id)
       setPets((prev) =>
-        prev.map((pet) => (pet.id === id ? { ...pet, arquivado: true } : pet))
+        prev.map((pet) =>
+          pet.id === id
+            ? { ...pet, arquivado: true, isArchived: true, archivedAt: new Date().toISOString() }
+            : pet
+        )
       )
       addToast("Pet arquivado com sucesso!")
     } catch {

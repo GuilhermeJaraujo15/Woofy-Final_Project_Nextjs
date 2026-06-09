@@ -1,6 +1,11 @@
 BEGIN;
 
 -- Adds admin-level soft archive metadata without removing existing data.
+ALTER TABLE public.pets
+  ADD COLUMN IF NOT EXISTS is_archived BOOLEAN NOT NULL DEFAULT FALSE,
+  ADD COLUMN IF NOT EXISTS archived_at TIMESTAMPTZ,
+  ADD COLUMN IF NOT EXISTS archived_by UUID REFERENCES public.profiles(id);
+
 ALTER TABLE public.agendamentos
   ADD COLUMN IF NOT EXISTS is_archived BOOLEAN NOT NULL DEFAULT FALSE,
   ADD COLUMN IF NOT EXISTS archived_at TIMESTAMPTZ,
@@ -21,6 +26,18 @@ ALTER TABLE public.exames
   ADD COLUMN IF NOT EXISTS archived_at TIMESTAMPTZ,
   ADD COLUMN IF NOT EXISTS archived_by UUID REFERENCES public.profiles(id);
 
+UPDATE public.pets
+SET is_archived = TRUE,
+    archived_at = COALESCE(archived_at, now())
+WHERE arquivado = TRUE
+  AND is_archived = FALSE;
+
+UPDATE public.pets
+SET arquivado = TRUE
+WHERE is_archived = TRUE
+  AND arquivado = FALSE;
+
+CREATE INDEX IF NOT EXISTS idx_pets_is_archived ON public.pets(is_archived);
 CREATE INDEX IF NOT EXISTS idx_agendamentos_is_archived ON public.agendamentos(is_archived);
 CREATE INDEX IF NOT EXISTS idx_consultas_is_archived ON public.consultas(is_archived);
 CREATE INDEX IF NOT EXISTS idx_vacinas_is_archived ON public.vacinas(is_archived);
