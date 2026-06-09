@@ -442,68 +442,72 @@ export default function AgendaPage() {
       </div>
 
       <div className="bg-card rounded-xl border border-border overflow-hidden">
-        <div className="grid grid-cols-7 border-b border-border">
-          {weekDays.map((date) => {
-            const { dayName, dayNumber, isToday } = formatDayHeader(date)
-            return (
-              <div
-                key={formatDateKey(date)}
-                className={cn(
-                  "p-3 text-center border-r border-border last:border-r-0",
-                  isToday && "bg-primary/5"
-                )}
-              >
-                <p className="text-xs text-muted-foreground uppercase">{dayName}</p>
-                <p
-                  className={cn(
-                    "text-lg font-semibold mt-1",
-                    isToday
-                      ? "text-primary-foreground bg-primary rounded-full w-8 h-8 flex items-center justify-center mx-auto"
-                      : "text-foreground"
-                  )}
-                >
-                  {dayNumber}
-                </p>
-              </div>
-            )
-          })}
-        </div>
-
-        <div className="grid grid-cols-7 min-h-[400px]">
-          {weekDays.map((date) => {
-            const dateKey = formatDateKey(date)
-            const dayAgendamentos = agendamentosByDay[dateKey] || []
-            const { isToday } = formatDayHeader(date)
-
-            return (
-              <div
-                key={dateKey}
-                className={cn(
-                  "p-2 border-r border-border last:border-r-0 min-h-[400px]",
-                  isToday && "bg-primary/5"
-                )}
-              >
-                <div className="space-y-2">
-                  {dayAgendamentos.map((agendamento) => (
-                    <button
-                      key={agendamento.id}
-                      onClick={() => setSelectedAgendamento(agendamento)}
+        <div className="overflow-x-auto">
+          <div className="min-w-[760px]">
+            <div className="grid grid-cols-7 border-b border-border">
+              {weekDays.map((date) => {
+                const { dayName, dayNumber, isToday } = formatDayHeader(date)
+                return (
+                  <div
+                    key={formatDateKey(date)}
+                    className={cn(
+                      "p-3 text-center border-r border-border last:border-r-0",
+                      isToday && "bg-primary/5"
+                    )}
+                  >
+                    <p className="text-xs text-muted-foreground uppercase">{dayName}</p>
+                    <p
                       className={cn(
-                        "w-full text-left p-2 rounded-lg text-xs text-white transition-opacity hover:opacity-80",
-                        vetColors[agendamento.veterinario] || "bg-primary"
+                        "text-lg font-semibold mt-1",
+                        isToday
+                          ? "text-primary-foreground bg-primary rounded-full w-8 h-8 flex items-center justify-center mx-auto"
+                          : "text-foreground"
                       )}
                     >
-                      <p className="font-medium truncate">{agendamento.petNome}</p>
-                      <p className="opacity-80">
-                        {agendamento.horarioInicio} - {agendamento.horarioFim}
-                      </p>
-                      <p className="mt-1 opacity-80">{agendamento.status}</p>
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )
-          })}
+                      {dayNumber}
+                    </p>
+                  </div>
+                )
+              })}
+            </div>
+
+            <div className="grid grid-cols-7 min-h-[400px]">
+              {weekDays.map((date) => {
+                const dateKey = formatDateKey(date)
+                const dayAgendamentos = agendamentosByDay[dateKey] || []
+                const { isToday } = formatDayHeader(date)
+
+                return (
+                  <div
+                    key={dateKey}
+                    className={cn(
+                      "p-2 border-r border-border last:border-r-0 min-h-[400px]",
+                      isToday && "bg-primary/5"
+                    )}
+                  >
+                    <div className="space-y-2">
+                      {dayAgendamentos.map((agendamento) => (
+                        <button
+                          key={agendamento.id}
+                          onClick={() => setSelectedAgendamento(agendamento)}
+                          className={cn(
+                            "w-full text-left p-2 rounded-lg text-xs text-white transition-opacity hover:opacity-80",
+                            vetColors[agendamento.veterinario] || "bg-primary"
+                          )}
+                        >
+                          <p className="font-medium truncate">{agendamento.petNome}</p>
+                          <p className="opacity-80">
+                            {agendamento.horarioInicio} - {agendamento.horarioFim}
+                          </p>
+                          <p className="mt-1 opacity-80">{agendamento.status}</p>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
         </div>
       </div>
 

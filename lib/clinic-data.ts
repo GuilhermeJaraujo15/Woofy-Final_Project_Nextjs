@@ -3,6 +3,13 @@ import type { ApprovalStatus, UserRole } from "@/lib/auth-routes"
 
 type SupabaseBrowserClient = ReturnType<typeof createClient>
 
+type SupabaseErrorLike = {
+  message?: string
+  code?: string
+  details?: string
+  hint?: string
+}
+
 export type Especie = "cao" | "gato" | "aves" | "roedores" | "coelhos" | "outro"
 export type AgendamentoStatus = "agendado" | "confirmado" | "realizado" | "cancelado"
 export type AppointmentStatus = AgendamentoStatus
@@ -508,8 +515,49 @@ function getFictitiousCrmv(profileId: string) {
 
 function clinicDataError(error: unknown) {
   if (error instanceof Error) return error
-  if (typeof error === "object" && error !== null) return new Error(JSON.stringify(error))
+  if (typeof error === "object" && error !== null) {
+    const supabaseError = error as SupabaseErrorLike
+    const parts = [
+      supabaseError.message,
+      supabaseError.code ? `code: ${supabaseError.code}` : null,
+      supabaseError.details ? `details: ${supabaseError.details}` : null,
+      supabaseError.hint ? `hint: ${supabaseError.hint}` : null,
+    ].filter(Boolean)
+
+    return new Error(parts.length > 0 ? parts.join(" | ") : JSON.stringify(error))
+  }
   return new Error(String(error))
+}
+
+export function getSupabaseErrorDebug(error: unknown) {
+  if (error instanceof Error) {
+    return {
+      message: error.message,
+      code: null,
+      details: null,
+      hint: null,
+      raw: error,
+    }
+  }
+
+  if (typeof error === "object" && error !== null) {
+    const supabaseError = error as SupabaseErrorLike
+    return {
+      message: supabaseError.message || JSON.stringify(error),
+      code: supabaseError.code || null,
+      details: supabaseError.details || null,
+      hint: supabaseError.hint || null,
+      raw: error,
+    }
+  }
+
+  return {
+    message: String(error),
+    code: null,
+    details: null,
+    hint: null,
+    raw: error,
+  }
 }
 
 function profileMap(profiles: ProfileRow[]) {
@@ -592,6 +640,15 @@ async function hasFinanceLink(client: SupabaseBrowserClient, origemTipo: string,
 
   if (error) throw clinicDataError(error)
   return Boolean(data?.length)
+}
+
+function isForeignKeyError(error: unknown) {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    (error as { code?: string }).code === "23503"
+  )
 }
 
 function mapClinicAppointment(
@@ -1025,7 +1082,7 @@ export async function getAdminPets(client: SupabaseBrowserClient) {
   const { data, error } = await client
     .from("pets")
     .select("*")
-    .eq("is_archived", false)
+    .or("is_archived.eq.false,is_archived.is.null")
     .order("created_at", { ascending: false })
 
   if (error) throw clinicDataError(error)
@@ -1098,12 +1155,35 @@ export async function updateAdminPet(client: SupabaseBrowserClient, petId: strin
 }
 
 export async function archiveAdminPet(client: SupabaseBrowserClient, petId: string, adminId: string) {
+  const archivedAt = new Date().toISOString()
+  const payload = { arquivado: true, is_archived: true, archived_at: archivedAt, archived_by: adminId }
   const { error } = await client
     .from("pets")
-    .update({ arquivado: true, is_archived: true, archived_at: new Date().toISOString(), archived_by: adminId })
+    .update(payload)
     .eq("id", petId)
+    .select("id")
+    .single()
 
-  if (error) throw clinicDataError(error)
+  if (!error) return
+
+  console.error("Erro ao arquivar pet:", { petId, adminId, payload, error })
+
+  if (isForeignKeyError(error)) {
+    const fallbackPayload = { ...payload, archived_by: null }
+    const { error: fallbackError } = await client
+      .from("pets")
+      .update(fallbackPayload)
+      .eq("id", petId)
+      .select("id")
+      .single()
+
+    if (!fallbackError) return
+
+    console.error("Erro ao arquivar pet sem archived_by:", { petId, adminId, payload: fallbackPayload, error: fallbackError })
+    throw clinicDataError(fallbackError)
+  }
+
+  throw clinicDataError(error)
 }
 
 export async function getPetsForVeterinarianWorkflow(
@@ -1989,8 +2069,13 @@ export async function restoreAdminPet(client: SupabaseBrowserClient, petId: stri
     .from("pets")
     .update({ arquivado: false, is_archived: false, archived_at: null, archived_by: null })
     .eq("id", petId)
+    .select("id")
+    .single()
 
-  if (error) throw clinicDataError(error)
+  if (error) {
+    console.error("Erro ao restaurar pet:", { petId, error })
+    throw clinicDataError(error)
+  }
 }
 
 export async function safeDeleteAdminPet(client: SupabaseBrowserClient, petId: string): Promise<SafeDeleteResult> {

@@ -21,6 +21,7 @@ import {
 import {
   archiveAdminPet,
   createAdminPet,
+  getSupabaseErrorDebug,
   getAdminPets,
   getClinicProfiles,
   safeDeleteAdminPet,
@@ -79,7 +80,7 @@ function PetCard({
   const Icon = especieIcons[pet.especie]
 
   return (
-    <div className="bg-card rounded-xl p-5 shadow-sm border border-border hover:shadow-md transition-shadow">
+    <div className="bg-card rounded-xl p-4 sm:p-5 shadow-sm border border-border hover:shadow-md transition-shadow">
       <div className="flex items-start gap-4">
         <div className="h-16 w-16 rounded-full bg-muted flex items-center justify-center flex-shrink-0">
           <Icon className="h-8 w-8 text-primary" />
@@ -88,7 +89,7 @@ function PetCard({
           <h3 className="font-semibold text-card-foreground text-lg truncate">
             {pet.nome}
           </h3>
-          <p className="text-sm text-muted-foreground">
+          <p className="break-words text-sm text-muted-foreground">
             {pet.raca} - {especieLabels[pet.especie]}
           </p>
           <p className="text-sm text-muted-foreground mt-1">
@@ -99,7 +100,7 @@ function PetCard({
       </div>
 
       <div className="mt-4 pt-4 border-t border-border">
-        <p className="text-sm font-medium text-card-foreground">
+        <p className="break-words text-sm font-medium text-card-foreground">
           {pet.tutorProfileName || pet.tutor}
         </p>
         <div className="flex items-center gap-1 text-sm text-muted-foreground mt-1">
@@ -108,24 +109,39 @@ function PetCard({
         </div>
       </div>
 
-      <div className="flex gap-2 mt-4">
+      <div className="flex flex-wrap gap-2 mt-4">
         <button
-          onClick={() => onEdit(pet)}
-          className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-secondary text-secondary-foreground rounded-lg hover:opacity-90 transition-opacity text-sm font-medium"
+          type="button"
+          onClick={(event) => {
+            event.preventDefault()
+            event.stopPropagation()
+            onEdit(pet)
+          }}
+          className="flex min-w-[8rem] flex-1 items-center justify-center gap-2 px-3 py-2 bg-secondary text-secondary-foreground rounded-lg hover:opacity-90 transition-opacity text-sm font-medium"
         >
           <Pencil className="h-4 w-4" />
           Editar
         </button>
         <button
-          onClick={() => onArchive(pet.id)}
-          className="flex items-center justify-center px-3 py-2 bg-muted text-muted-foreground rounded-lg hover:bg-muted/80 transition-colors"
+          type="button"
+          onClick={(event) => {
+            event.preventDefault()
+            event.stopPropagation()
+            onArchive(pet.id)
+          }}
+          className="flex h-10 w-10 items-center justify-center rounded-lg bg-muted text-muted-foreground transition-colors hover:bg-muted/80"
           title="Arquivar pet"
         >
           <Archive className="h-4 w-4" />
         </button>
         <button
-          onClick={() => onDelete(pet.id)}
-          className="flex items-center justify-center px-3 py-2 bg-destructive text-destructive-foreground rounded-lg hover:opacity-90 transition-opacity"
+          type="button"
+          onClick={(event) => {
+            event.preventDefault()
+            event.stopPropagation()
+            onDelete(pet.id)
+          }}
+          className="flex h-10 w-10 items-center justify-center rounded-lg bg-destructive text-destructive-foreground transition-opacity hover:opacity-90"
           title="Excluir definitivamente"
         >
           <Trash2 className="h-4 w-4" />
@@ -277,7 +293,7 @@ function PetModal({
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid gap-4 sm:grid-cols-2">
             <div>
               <label className="block text-sm font-medium text-card-foreground mb-1">
                 Data de Nascimento
@@ -335,7 +351,7 @@ function PetModal({
             />
           </div>
 
-          <div className="flex gap-3 pt-4">
+          <div className="flex flex-col gap-3 pt-4 sm:flex-row">
             <button
               type="button"
               onClick={onClose}
@@ -447,16 +463,23 @@ export default function PetsPage() {
 
     try {
       await archiveAdminPet(supabase, id, user.id)
-      setPets((prev) =>
-        prev.map((pet) =>
-          pet.id === id
-            ? { ...pet, arquivado: true, isArchived: true, archivedAt: new Date().toISOString() }
-            : pet
-        )
-      )
+      setPets((prev) => prev.filter((pet) => pet.id !== id))
       addToast("Pet arquivado com sucesso!")
-    } catch {
-      addToast("Não foi possível arquivar o pet.", "error")
+    } catch (error) {
+      const supabaseError = getSupabaseErrorDebug(error)
+      console.error("Erro ao arquivar pet:", {
+        table: "pets",
+        petId: id,
+        adminId: user.id,
+        payload: {
+          arquivado: true,
+          is_archived: true,
+          archived_at: "new Date().toISOString()",
+          archived_by: user.id,
+        },
+        supabaseError,
+      })
+      addToast(`Não foi possível arquivar o pet: ${supabaseError.message}`, "error")
     }
   }
 
@@ -474,8 +497,10 @@ export default function PetsPage() {
       }
       setPets((prev) => prev.filter((pet) => pet.id !== id))
       addToast("Pet excluído definitivamente.")
-    } catch {
-      addToast("Não foi possível excluir o pet.", "error")
+    } catch (error) {
+      const supabaseError = getSupabaseErrorDebug(error)
+      console.error("Erro ao excluir pet:", { table: "pets", petId: id, supabaseError })
+      addToast(`Não foi possível excluir o pet: ${supabaseError.message}`, "error")
     }
   }
 
@@ -498,7 +523,7 @@ export default function PetsPage() {
         </div>
         <button
           onClick={() => handleOpenModal()}
-          className="flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:opacity-90 transition-opacity font-medium"
+          className="flex w-full items-center justify-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-lg hover:opacity-90 transition-opacity font-medium sm:w-auto"
         >
           <Plus className="h-5 w-5" />
           Novo Pet
@@ -519,7 +544,7 @@ export default function PetsPage() {
         <select
           value={filterEspecie}
           onChange={(e) => setFilterEspecie(e.target.value)}
-          className="px-4 py-2 border border-input rounded-lg bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+          className="w-full px-4 py-2 border border-input rounded-lg bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-ring sm:w-auto"
         >
           <option value="todos">Todas as espécies</option>
           <option value="cao">Cães</option>

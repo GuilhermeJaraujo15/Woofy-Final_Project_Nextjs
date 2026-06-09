@@ -118,7 +118,7 @@ export default function ArquivadosPage() {
               key={tab.id}
               type="button"
               onClick={() => setActiveTab(tab.id)}
-              className={`inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${
+              className={`inline-flex min-h-10 flex-1 items-center justify-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium transition-colors sm:flex-none ${
                 isActive ? "border-primary bg-primary text-primary-foreground" : "border-border bg-card text-card-foreground hover:bg-muted"
               }`}
             >
@@ -195,16 +195,16 @@ function ArchivedGrid({ children, emptyText }: { children: React.ReactNode; empt
 function ArchivedItem({ title, lines, onRestore }: { title: string; lines: string[]; onRestore: () => void }) {
   return (
     <div className="rounded-xl border border-border bg-card p-5 shadow-sm">
-      <h2 className="font-semibold text-card-foreground">{title}</h2>
+      <h2 className="break-words font-semibold text-card-foreground">{title}</h2>
       <div className="mt-2 space-y-1">
         {lines.map((line) => (
-          <p key={line} className="text-sm text-muted-foreground">{line}</p>
+          <p key={line} className="break-words text-sm text-muted-foreground">{line}</p>
         ))}
       </div>
       <button
         type="button"
         onClick={onRestore}
-        className="mt-4 inline-flex items-center gap-2 rounded-lg border border-border px-3 py-2 text-sm font-medium text-card-foreground transition-colors hover:bg-muted"
+        className="mt-4 inline-flex min-h-10 w-full items-center justify-center gap-2 rounded-lg border border-border px-3 py-2 text-sm font-medium text-card-foreground transition-colors hover:bg-muted sm:w-auto"
       >
         <ArchiveRestore className="h-4 w-4" />
         Restaurar

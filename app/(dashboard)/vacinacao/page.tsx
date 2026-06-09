@@ -204,7 +204,7 @@ export default function VacinacaoPage() {
       {sortedVacinas.length > 0 ? (
         <div className="bg-card rounded-xl border border-border overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="w-full">
+            <table className="w-full min-w-[1500px]">
               <thead>
                 <tr className="bg-muted/50">
                   <th className="text-left px-4 py-3 text-sm font-semibold text-card-foreground">Pet</th>

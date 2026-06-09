@@ -188,7 +188,7 @@ export default function FinanceiroPage() {
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
                   <Label htmlFor="tipo">Tipo</Label>
                   <Select
@@ -219,7 +219,7 @@ export default function FinanceiroPage() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2">
                   <Label htmlFor="data">Data</Label>
                   <Input
@@ -250,7 +250,7 @@ export default function FinanceiroPage() {
                 </div>
               </div>
 
-              <div className="flex justify-end gap-3 pt-4">
+              <div className="flex flex-col justify-end gap-3 pt-4 sm:flex-row">
                 <Button type="button" variant="outline" onClick={() => setIsModalOpen(false)}>
                   Cancelar
                 </Button>
@@ -263,12 +263,12 @@ export default function FinanceiroPage() {
         </Dialog>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
         <div className="bg-card rounded-xl p-5 border border-border">
           <div className="flex items-center justify-between">
-            <div>
+            <div className="min-w-0">
               <p className="text-sm text-muted-foreground">Receita do Mês</p>
-              <p className="text-2xl font-bold text-woofy-accent mt-1">
+              <p className="mt-1 break-words text-xl font-bold text-woofy-accent sm:text-2xl">
                 {formatCurrency(receitaMes)}
               </p>
             </div>
@@ -280,9 +280,9 @@ export default function FinanceiroPage() {
 
         <div className="bg-card rounded-xl p-5 border border-border">
           <div className="flex items-center justify-between">
-            <div>
+            <div className="min-w-0">
               <p className="text-sm text-muted-foreground">Despesas do Mês</p>
-              <p className="text-2xl font-bold text-destructive mt-1">
+              <p className="mt-1 break-words text-xl font-bold text-destructive sm:text-2xl">
                 {formatCurrency(despesasMes)}
               </p>
             </div>
@@ -294,10 +294,10 @@ export default function FinanceiroPage() {
 
         <div className="bg-card rounded-xl p-5 border border-border">
           <div className="flex items-center justify-between">
-            <div>
+            <div className="min-w-0">
               <p className="text-sm text-muted-foreground">Lucro Líquido</p>
               <p
-                className={`text-2xl font-bold mt-1 ${
+                className={`mt-1 break-words text-xl font-bold sm:text-2xl ${
                   lucroLiquido >= 0 ? "text-primary" : "text-destructive"
                 }`}
               >
@@ -313,7 +313,7 @@ export default function FinanceiroPage() {
 
       {sortedLancamentos.length > 0 ? (
         <div className="bg-card rounded-xl border border-border overflow-hidden">
-          <Table>
+          <Table className="min-w-[720px]">
             <TableHeader>
               <TableRow>
                 <TableHead>Descrição</TableHead>

@@ -79,7 +79,7 @@ export function Sidebar() {
           mobileOpen ? "translate-x-0" : "-translate-x-full"
         )}
       >
-        <div className="flex flex-col gap-1 p-4">
+        <div className="flex min-h-full flex-col gap-1 p-4 pb-8">
           {navItems.map((item) => {
             const Icon = item.icon
             const isActive = pathname === item.href
@@ -89,7 +89,7 @@ export function Sidebar() {
                 href={item.href}
                 onClick={() => setMobileOpen(false)}
                 className={cn(
-                  "flex items-center gap-3 px-4 py-3 rounded-lg transition-colors",
+                  "flex items-center gap-3 rounded-lg px-4 py-3 transition-colors",
                   isActive
                     ? "bg-sidebar-accent text-sidebar-accent-foreground"
                     : "text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground"
@@ -133,7 +133,7 @@ export function Sidebar() {
                   key={item.href}
                   href={item.href}
                   className={cn(
-                    "flex items-center gap-3 px-4 py-3 rounded-lg transition-colors",
+                    "flex items-center gap-3 rounded-lg px-4 py-3 transition-colors",
                     isActive
                       ? "bg-sidebar-accent text-sidebar-accent-foreground"
                       : "text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground"
@@ -152,7 +152,7 @@ export function Sidebar() {
             <div className="h-10 w-10 rounded-full bg-sidebar-accent flex items-center justify-center">
               <span className="text-sidebar-accent-foreground font-semibold">W</span>
             </div>
-            <div>
+            <div className="min-w-0">
               <p className="text-sm font-medium text-sidebar-foreground">Woofy Vet</p>
               <p className="text-xs text-sidebar-foreground/60">Clinica Veterinaria</p>
             </div>
