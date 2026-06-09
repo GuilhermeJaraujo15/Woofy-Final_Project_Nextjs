@@ -11,24 +11,24 @@ export function TeamSection() {
     },
     {
       name: "Dr. Ricardo Santos",
-      role: "Cirurgião Geral e Ortopedia",
+      role: "Patologista Clínico Veterinário",
       crmv: "CRMV-SP 54321",
       image: "https://images.unsplash.com/photo-1622253692010-333f2da6031d?q=80&w=400",
-      bio: "Responsável pelas cirurgias complexas e atendimentos ortopédicos, focado em reabilitação rápida e indolor.",
+      bio: "Expertise em análises laboratoriais (sangue, urina, fezes, biópsias), garantindo diagnósticos precisos para tratamentos eficazes.",
     },
     {
       name: "Dra. Beatriz Albuquerque",
       role: "Cardiologia Veterinária",
       crmv: "CRMV-SP 98765",
       image: "https://images.unsplash.com/photo-1594824476967-48c8b964273f?q=80&w=400",
-      bio: "Realiza exames cardiológicos e diagnósticos por imagem, cuidando da saúde cardiovascular dos nossos pacientes seniores.",
+      bio: "Realiza exames cardiológicos e diagnósticos por imagem, cuidando da saúde cardiovascular dos nossos pacientes.",
     },
     {
       name: "Thiago Ramos",
-      role: "Esteticista e Groomer Premium",
-      crmv: "Especialista em Pelagem",
+      role: "Diagnóstico por Imagem Veterinário",
+      crmv: "CRMV-SP 67890",
       image: "https://images.unsplash.com/photo-1537368910025-700350fe46c7?q=80&w=400",
-      bio: "Especialista em tosa higiênica, hidratação de subpelos e tosa de raça, transformando o banho em um spa relaxante.",
+      bio: "Especialista em realizar e laudar exames de imagem, como ultrassom, raio-x, tomografia e ressonância magnética.",
     },
   ]
 
