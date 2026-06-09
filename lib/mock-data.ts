@@ -32,15 +32,6 @@ export interface Vacina {
   proximaDose: string
 }
 
-export interface HistoricoItem {
-  id: string
-  petId: string
-  data: string
-  tipo: "consulta" | "vacina" | "exame"
-  descricao: string
-  veterinario: string
-}
-
 export interface Lancamento {
   id: string
   descricao: string
@@ -249,57 +240,6 @@ export const vacinas: Vacina[] = [
     vacina: "Gripe Canina",
     dataAplicacao: "2026-01-10",
     proximaDose: "2026-07-10",
-  },
-]
-
-export const historico: HistoricoItem[] = [
-  {
-    id: "1",
-    petId: "1",
-    data: "2026-05-15",
-    tipo: "consulta",
-    descricao: "Consulta de rotina - animal saudável",
-    veterinario: "Dr. Carlos Silva",
-  },
-  {
-    id: "2",
-    petId: "1",
-    data: "2025-06-01",
-    tipo: "vacina",
-    descricao: "Aplicação da vacina V10",
-    veterinario: "Dra. Maria Santos",
-  },
-  {
-    id: "3",
-    petId: "1",
-    data: "2025-03-20",
-    tipo: "exame",
-    descricao: "Exame de sangue completo - resultados normais",
-    veterinario: "Dr. Pedro Costa",
-  },
-  {
-    id: "4",
-    petId: "2",
-    data: "2026-04-10",
-    tipo: "consulta",
-    descricao: "Tratamento de infecção urinária",
-    veterinario: "Dra. Ana Oliveira",
-  },
-  {
-    id: "5",
-    petId: "2",
-    data: "2025-08-10",
-    tipo: "vacina",
-    descricao: "Aplicação da vacina Tríplice Felina",
-    veterinario: "Dr. Carlos Silva",
-  },
-  {
-    id: "6",
-    petId: "3",
-    data: "2026-05-28",
-    tipo: "consulta",
-    descricao: "Tratamento de lesão na pata dianteira esquerda",
-    veterinario: "Dr. Pedro Costa",
   },
 ]
 

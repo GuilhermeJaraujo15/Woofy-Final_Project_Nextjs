@@ -137,7 +137,7 @@ export default function TutorPage() {
   const [vacinas, setVacinas] = useState<AdminVaccine[]>([])
   const [exames, setExames] = useState<AdminExam[]>([])
   const [feedbacks, setFeedbacks] = useState<TutorConsultationFeedback[]>([])
-  const [historico, setHistorico] = useState<AdminHistoryEntry[]>([])
+  const [clinicalRecords, setClinicalRecords] = useState<AdminHistoryEntry[]>([])
   const [financialSummary, setFinancialSummary] = useState({ consultationTotal: 0, vaccineTotal: 0, examTotal: 0, total: 0 })
   const [vaccineCancelForms, setVaccineCancelForms] = useState<Record<string, { isOpen: boolean; reason: string }>>({})
   const [examCancelForms, setExamCancelForms] = useState<Record<string, { isOpen: boolean; reason: string }>>({})
@@ -169,7 +169,7 @@ export default function TutorPage() {
           vacinasResult,
           examesResult,
           feedbacksResult,
-          historicoResult,
+          clinicalRecordsResult,
           financialSummaryResult,
           veterinariansResult,
         ] = await Promise.allSettled([
@@ -189,7 +189,7 @@ export default function TutorPage() {
           vacinasResult.status === "rejected" ? vacinasResult.reason : null,
           examesResult.status === "rejected" ? examesResult.reason : null,
           feedbacksResult.status === "rejected" ? feedbacksResult.reason : null,
-          historicoResult.status === "rejected" ? historicoResult.reason : null,
+          clinicalRecordsResult.status === "rejected" ? clinicalRecordsResult.reason : null,
           financialSummaryResult.status === "rejected" ? financialSummaryResult.reason : null,
           veterinariansResult.status === "rejected" ? veterinariansResult.reason : null,
         ].filter(Boolean)
@@ -204,7 +204,7 @@ export default function TutorPage() {
         setVacinas(vacinasResult.status === "fulfilled" ? vacinasResult.value : [])
         setExames(examesResult.status === "fulfilled" ? examesResult.value : [])
         setFeedbacks(feedbacksResult.status === "fulfilled" ? feedbacksResult.value : [])
-        setHistorico(historicoResult.status === "fulfilled" ? historicoResult.value : [])
+        setClinicalRecords(clinicalRecordsResult.status === "fulfilled" ? clinicalRecordsResult.value : [])
         setFinancialSummary(
           financialSummaryResult.status === "fulfilled"
             ? financialSummaryResult.value
@@ -246,7 +246,7 @@ export default function TutorPage() {
       tipo: "Consulta",
       text: item.feedback,
     }))
-    const historyOnlyItems = historico
+    const clinicalRecordItems = clinicalRecords
       .filter((item) => {
         if (item.agendamentoId && feedbackAppointmentIds.has(item.agendamentoId)) return false
         if (item.consultaId && feedbackConsultationIds.has(item.consultaId)) return false
@@ -261,8 +261,8 @@ export default function TutorPage() {
         text: item.descricao,
       }))
 
-    return [...feedbackItems, ...historyOnlyItems].sort((a, b) => b.data.localeCompare(a.data))
-  }, [feedbacks, historico])
+    return [...feedbackItems, ...clinicalRecordItems].sort((a, b) => b.data.localeCompare(a.data))
+  }, [clinicalRecords, feedbacks])
   const formatCurrency = (value: number) =>
     new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(value)
 
@@ -502,7 +502,7 @@ export default function TutorPage() {
             Olá, {tutorName}
           </h1>
           <p className="mt-2 max-w-2xl text-sm text-slate-600 dark:text-slate-300">
-            Acompanhe seus pets, solicite agendamentos e consulte vacinas e histórico registrados pela clínica.
+            Acompanhe seus pets, solicite agendamentos e consulte vacinas e retornos registrados pela clínica.
           </p>
         </section>
 

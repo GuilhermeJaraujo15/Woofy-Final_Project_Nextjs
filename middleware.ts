@@ -2,7 +2,7 @@ import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 import { getRoleHome, isApprovalStatus, isUserRole, type ApprovalStatus, type UserRole } from '@/lib/auth-routes'
 
-const adminRoutes = ['/dashboard', '/pets', '/consultas', '/vacinacao', '/historico', '/financeiro', '/agenda']
+const adminRoutes = ['/dashboard', '/pets', '/consultas', '/vacinacao', '/financeiro', '/agenda']
 const tutorRoutes = ['/tutor']
 const veterinarioRoutes = ['/veterinario']
 const protectedRoutes = [...adminRoutes, ...tutorRoutes, ...veterinarioRoutes]

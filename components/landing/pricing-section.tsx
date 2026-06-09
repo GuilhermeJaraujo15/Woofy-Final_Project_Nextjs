@@ -7,7 +7,7 @@ const plans = [
     name: "Starter",
     price: "R$ 89",
     description: "Ideal para profissionais autônomos e pequenos negócios.",
-    features: ["Até 100 pets", "Agenda básica", "Histórico simples", "Suporte via email"],
+    features: ["Até 100 pets", "Agenda básica", "Registros clínicos simples", "Suporte via email"],
     highlight: false
   },
   {

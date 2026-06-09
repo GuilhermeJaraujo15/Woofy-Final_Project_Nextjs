@@ -5,13 +5,11 @@ import {
   pets as initialPets,
   consultas as initialConsultas,
   vacinas as initialVacinas,
-  historico as initialHistorico,
   lancamentos as initialLancamentos,
   agendamentos as initialAgendamentos,
   type Pet,
   type Consulta,
   type Vacina,
-  type HistoricoItem,
   type Lancamento,
   type Agendamento,
 } from "@/lib/mock-data"
@@ -29,8 +27,6 @@ interface AppContextType {
   setConsultas: React.Dispatch<React.SetStateAction<Consulta[]>>
   vacinas: Vacina[]
   setVacinas: React.Dispatch<React.SetStateAction<Vacina[]>>
-  historico: HistoricoItem[]
-  setHistorico: React.Dispatch<React.SetStateAction<HistoricoItem[]>>
   lancamentos: Lancamento[]
   setLancamentos: React.Dispatch<React.SetStateAction<Lancamento[]>>
   agendamentos: Agendamento[]
@@ -46,7 +42,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [pets, setPets] = useState<Pet[]>(initialPets)
   const [consultas, setConsultas] = useState<Consulta[]>(initialConsultas)
   const [vacinas, setVacinas] = useState<Vacina[]>(initialVacinas)
-  const [historico, setHistorico] = useState<HistoricoItem[]>(initialHistorico)
   const [lancamentos, setLancamentos] = useState<Lancamento[]>(initialLancamentos)
   const [agendamentos, setAgendamentos] = useState<Agendamento[]>(initialAgendamentos)
   const [toasts, setToasts] = useState<Toast[]>([])
@@ -72,8 +67,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
         setConsultas,
         vacinas,
         setVacinas,
-        historico,
-        setHistorico,
         lancamentos,
         setLancamentos,
         agendamentos,

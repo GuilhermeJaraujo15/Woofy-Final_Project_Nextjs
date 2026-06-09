@@ -462,7 +462,7 @@ export default function PetsPage() {
 
   const handleDelete = async (id: string) => {
     const confirmed = window.confirm(
-      "Este pet pode ter consultas, vacinas, exames, histórico médico e lançamentos financeiros vinculados. Excluir definitivamente pode afetar esses registros. Deseja continuar?",
+      "Este pet pode ter consultas, vacinas, exames, retornos clínicos e lançamentos financeiros vinculados. Excluir definitivamente pode afetar esses registros. Deseja continuar?",
     )
     if (!confirmed) return
 

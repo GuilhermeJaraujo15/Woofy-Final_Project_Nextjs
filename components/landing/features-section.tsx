@@ -10,7 +10,7 @@ import {
 const features = [
   {
     title: "Gestão de Clientes",
-    description: "Cadastro completo de tutores e seus pets com histórico detalhado e fácil acesso.",
+    description: "Cadastro completo de tutores e seus pets com registros clínicos detalhados e fácil acesso.",
     icon: Users,
     color: "bg-[#AAC9BA]/20 text-[#305165]"
   },
@@ -33,7 +33,7 @@ const features = [
     color: "bg-[#B1AE77]/20 text-[#305165]"
   },
   {
-    title: "Histórico dos Pets",
+    title: "Registros dos Pets",
     description: "Acompanhe a evolução da saúde e serviços de cada pet em uma linha do tempo intuitiva.",
     icon: Heart,
     color: "bg-[#AAC9BA]/20 text-[#305165]"
