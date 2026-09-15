@@ -1,0 +1,172 @@
+"use client"
+
+import Link from "next/link"
+import { usePathname, useRouter } from "next/navigation"
+import {
+  LayoutDashboard,
+  PawPrint,
+  Stethoscope,
+  Syringe,
+  DollarSign,
+  CalendarDays,
+  Archive,
+  Home,
+  LogOut,
+  Menu,
+  UserCheck,
+  X,
+} from "lucide-react"
+import { useState } from "react"
+import { cn } from "@/lib/utils"
+import { useAuth } from "@/context/auth-context"
+
+const navItems = [
+  { href: "/", label: "Voltar ao site", icon: Home },
+  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/dashboard/aprovacoes", label: "Aprovações", icon: UserCheck },
+  { href: "/pets", label: "Pets", icon: PawPrint },
+  { href: "/consultas", label: "Consultas", icon: Stethoscope },
+  { href: "/vacinacao", label: "Vacinação", icon: Syringe },
+  { href: "/financeiro", label: "Financeiro", icon: DollarSign },
+  { href: "/agenda", label: "Agenda", icon: CalendarDays },
+  { href: "/arquivados", label: "Arquivados", icon: Archive },
+]
+
+export function Sidebar() {
+  const pathname = usePathname()
+  const router = useRouter()
+  const { signOut } = useAuth()
+  const [mobileOpen, setMobileOpen] = useState(false)
+
+  async function handleSignOut() {
+    await signOut()
+    setMobileOpen(false)
+    router.replace("/")
+  }
+
+  return (
+    <>
+      {/* Mobile Header */}
+      <header className="fixed top-0 left-0 right-0 h-16 bg-sidebar flex items-center justify-between px-4 lg:hidden z-50">
+        <Link href="/" className="flex items-center gap-2">
+          <img
+            src="/logo-pet-shop.png"
+            alt="Woofy"
+            className="h-10"
+          />
+        </Link>
+        <button
+          onClick={() => setMobileOpen(!mobileOpen)}
+          className="text-sidebar-foreground p-2"
+          aria-label="Toggle menu"
+        >
+          {mobileOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
+        </button>
+      </header>
+
+      {/* Mobile Navigation Overlay */}
+      {mobileOpen && (
+        <div
+          className="fixed inset-0 bg-black/50 z-40 lg:hidden"
+          onClick={() => setMobileOpen(false)}
+        />
+      )}
+
+      {/* Mobile Navigation */}
+      <nav
+        className={cn(
+          "fixed top-16 left-0 bottom-0 w-64 overflow-y-auto bg-sidebar transform transition-transform duration-300 z-40 lg:hidden",
+          mobileOpen ? "translate-x-0" : "-translate-x-full"
+        )}
+      >
+        <div className="flex min-h-full flex-col gap-1 p-4 pb-8">
+          {navItems.map((item) => {
+            const Icon = item.icon
+            const isActive = pathname === item.href
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                onClick={() => setMobileOpen(false)}
+                className={cn(
+                  "flex items-center gap-3 rounded-lg px-4 py-3 transition-colors",
+                  isActive
+                    ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                    : "text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground"
+                )}
+              >
+                <Icon className="h-5 w-5" />
+                <span className="font-medium">{item.label}</span>
+              </Link>
+            )
+          })}
+          <button
+            type="button"
+            onClick={handleSignOut}
+            className="mt-3 flex items-center gap-3 rounded-lg px-4 py-3 text-sidebar-foreground/70 transition-colors hover:bg-sidebar-accent/50 hover:text-sidebar-foreground"
+          >
+            <LogOut className="h-5 w-5" />
+            <span className="font-medium">Sair</span>
+          </button>
+        </div>
+      </nav>
+
+      {/* Desktop Sidebar */}
+      <aside className="hidden lg:flex fixed top-0 left-0 h-dvh w-64 bg-sidebar flex-col overflow-hidden z-50">
+        <div className="shrink-0 p-6">
+          <Link href="/" className="flex items-center gap-2">
+            <img
+              src="\logo-pet-shop.png"
+              alt="Woofy"
+              className="h-12"
+            />
+          </Link>
+        </div>
+
+        <nav className="min-h-0 flex-1 overflow-y-auto px-4 pb-4">
+          <div className="flex flex-col gap-1">
+            {navItems.map((item) => {
+              const Icon = item.icon
+              const isActive = pathname === item.href
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className={cn(
+                    "flex items-center gap-3 rounded-lg px-4 py-3 transition-colors",
+                    isActive
+                      ? "bg-sidebar-accent text-sidebar-accent-foreground"
+                      : "text-sidebar-foreground/70 hover:bg-sidebar-accent/50 hover:text-sidebar-foreground"
+                  )}
+                >
+                  <Icon className="h-5 w-5" />
+                  <span className="font-medium">{item.label}</span>
+                </Link>
+              )
+            })}
+          </div>
+        </nav>
+
+        <div className="shrink-0 border-t border-sidebar-border p-4">
+          <div className="flex items-center gap-3 px-4 py-2">
+            <div className="h-10 w-10 rounded-full bg-sidebar-accent flex items-center justify-center">
+              <span className="text-sidebar-accent-foreground font-semibold">W</span>
+            </div>
+            <div className="min-w-0">
+              <p className="text-sm font-medium text-sidebar-foreground">Woofy Vet</p>
+              <p className="text-xs text-sidebar-foreground/60">Clinica Veterinaria</p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={handleSignOut}
+            className="mt-3 flex w-full items-center gap-3 rounded-lg px-4 py-3 text-sidebar-foreground/70 transition-colors hover:bg-sidebar-accent/50 hover:text-sidebar-foreground"
+          >
+            <LogOut className="h-5 w-5" />
+            <span className="font-medium">Sair</span>
+          </button>
+        </div>
+      </aside>
+    </>
+  )
+}
