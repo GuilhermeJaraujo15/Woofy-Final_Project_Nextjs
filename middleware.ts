@@ -1,5 +1,6 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
+import { getSupabaseConfig } from '@/lib/supabase-config'
 import { getRoleHome, isApprovalStatus, isUserRole, type ApprovalStatus, type UserRole } from '@/lib/auth-routes'
 
 const adminRoutes = ['/dashboard', '/pets', '/consultas', '/vacinacao', '/financeiro', '/agenda']
@@ -18,9 +19,10 @@ export async function middleware(request: NextRequest) {
     request,
   })
 
+  const { url, key } = getSupabaseConfig()
   const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    url,
+    key,
     {
       cookies: {
         getAll() {
