@@ -1,11 +1,28 @@
 (EN)
 
-Este é um Sistema chamado Woofy, o qual se refere a uma Clínica Veterinária que possue diferentes perfis, dentre os quais são: Tutor (Usuário comum), Veterinário (Médico Responsável em atender as Consultas, passar Vacinas e receitar Exames) e o Administrador que tem nas mãos controle sobre todo o Sistema. Este usa React e Nextjs como Framework principais. E por fim, os dados deste estão guardados no Banco de Dados do Supabase.
+This is a system called Woofy, which refers to a veterinary clinic with different user roles, including: Pet Owner (regular user), Veterinarian (the doctor responsible for conducting consultations, administering vaccines, and ordering tests), and the Administrator, who has control over the entire system. It uses React and Next.js as its primary frameworks. Finally, the data is stored in the Supabase database.
 
-Vale ressaltar que este Sistema foi feito em Conjunto com meu grupo do Senai, onde o repositório compartilhado e a separação das branch se encontram em "https://github.com/heloisabolognesi/Woofy-projetoFinal.git"
+It’s worth noting that this system was developed in collaboration with my Senai group; the shared repository and branch structure can be found at “https://github.com/heloisabolognesi/Woofy-projetoFinal.git”
 
-Analise-o neste link a seguir, onde levar-te-á à sua hospedagem na Vercel > https://woofy-six.vercel.app/
+Check it out at the following link, which will take you to its hosting on Vercel > https://woofy-six.vercel.app/
 
+## Deploy to Vercel
+
+Configure the variables in **Settings → Environment Variables** before the build:
+
+- `NEXT_PUBLIC_SUPABASE_URL`: URL of the Supabase project.
+- `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`: public key provided by the current integration. Alternatively, the code also accepts `NEXT_PUBLIC_SUPABASE_ANON_KEY`.
+
+When both keys are present, the publishable key takes precedence. The URL and key must belong to the same Supabase project. Never use a secret key or `service_role` in public variables.
+
+Confirm that the database is connected to the Vercel Woofy project and that the variables are available in the **Production** environment for production or the **Preview** environment for previews. The branch name alone does not identify this environment; check the environment displayed on Vercel.
+
+Use the **Next.js** preset, the directory containing this `package.json` as the root, and `pnpm build` as the build command. After changing the variables, run a new deployment: the `NEXT_PUBLIC_` values are incorporated during the build. For local development, copy `.env.example` to `.env.local` and fill in the values.
+
+References: [Supabase/Vercel integration](https://supabase.com/docs/guides/integrations/vercel-marketplace) and [Vercel environment variables](https://vercel.com/docs/environment-variables).
+
+
+(PT)
 
 Este é um Sistema chamado Woofy, o qual se refere a uma Clínica Veterinária que possue diferentes perfis, dentre os quais são: Tutor (Usuário comum), Veterinário (Médico Responsável em atender as Consultas, passar Vacinas e receitar Exames) e o Administrador que tem nas mãos controle sobre todo o Sistema. Este usa React e Nextjs como Framework principais. E por fim, os dados deste estão guardados no Banco de Dados do Supabase.
 
