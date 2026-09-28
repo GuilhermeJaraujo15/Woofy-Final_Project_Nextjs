@@ -24,7 +24,7 @@ References: [Supabase/Vercel integration](https://supabase.com/docs/guides/integ
 
 (PT)
 
-Este é um Sistema chamado Woofy, o qual se refere a uma Clínica Veterinária que possue diferentes perfis, dentre os quais são: Tutor (Usuário comum), Veterinário (Médico Responsável em atender as Consultas, passar Vacinas e receitar Exames) e o Administrador que tem nas mãos controle sobre todo o Sistema. Este usa React e Nextjs como Framework principais. E por fim, os dados deste estão guardados no Banco de Dados do Supabase.
+Este é um Sistema chamado Woofy, o qual se refere a uma Clínica Veterinária que possue diferentes perfis, dentre os quais são: Tutor (Usuário comum), Veterinário (Médico Responsável em atender as Consultas, passar Vacinas e receitar Exames) e o Administrador que tem nas mãos controle sobre todo o Sistema. Este usa React e Nextjs como Frameworks principais. E por fim, os dados deste estão guardados no Banco de Dados do Supabase.
 
 Vale ressaltar que este Sistema foi feito em Conjunto com meu grupo do Senai, onde o repositório compartilhado e a separação das branch se encontram em "https://github.com/GuilhermeJaraujo15/Woofy-Final_Project_Nextjs" 
 
