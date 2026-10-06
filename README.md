@@ -1,6 +1,6 @@
 (EN)
 
-This is a system called Woofy, which refers to a veterinary clinic with different user roles, including: Pet Owner (regular user), Veterinarian (the doctor responsible for conducting consultations, administering vaccines, and ordering tests), and the Administrator, who has control over the entire system. It uses React and Next.js as its primary frameworks. Finally, the data is stored in the Supabase database.
+This is a system of Woofy, which refers to a veterinary clinic with different user roles, including: Pet Owner (regular user), Veterinarian (the doctor responsible for conducting consultations, administering vaccines, and ordering tests), and the Administrator, who has control over the entire system. It uses React and Next.js as its primary frameworks. Finally, the data is stored in the Supabase database.
 
 It’s worth noting that this system was developed in collaboration with my Senai group; the shared repository and branch structure can be found at “https://github.com/GuilhermeJaraujo15/Woofy-Final_Project_Nextjs”
 
@@ -24,7 +24,7 @@ References: [Supabase/Vercel integration](https://supabase.com/docs/guides/integ
 
 (PT)
 
-Este é um Sistema chamado Woofy, o qual se refere a uma Clínica Veterinária que possue diferentes perfis, dentre os quais são: Tutor (Usuário comum), Veterinário (Médico Responsável em atender as Consultas, passar Vacinas e receitar Exames) e o Administrador que tem nas mãos controle sobre todo o Sistema. Este usa React e Nextjs como Frameworks principais. E por fim, os dados deste estão guardados no Banco de Dados do Supabase.
+Este é um Sistema da Woofy, o qual se refere a uma Clínica Veterinária que possue diferentes perfis, dentre os quais são: Tutor (Usuário comum), Veterinário (Médico Responsável em atender as Consultas, passar Vacinas e receitar Exames) e o Administrador que tem nas mãos controle sobre todo o Sistema. Este usa React e Nextjs como Frameworks principais. E por fim, os dados deste estão guardados no Banco de Dados do Supabase.
 
 Vale ressaltar que este Sistema foi feito em Conjunto com meu grupo do Senai, onde o repositório compartilhado e a separação das branch se encontram em "https://github.com/GuilhermeJaraujo15/Woofy-Final_Project_Nextjs" 
 
